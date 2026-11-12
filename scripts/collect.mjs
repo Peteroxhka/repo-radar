@@ -6,6 +6,8 @@ const TOKEN=process.env.GH_TOKEN;
 if(!BASE||!KEY||!TOKEN)throw new Error("Missing Supabase or GitHub Actions credentials.");
 
 const QUERIES=[
+ ["games","ps4 in:name"],["games","topic:ps4"],["ai","chatgpt in:name"],
+ ["games","minecraft in:name"],["games","ps3 in:name"],["ai","ollama in:name"],
  ["programming","topic:javascript"],["programming","topic:python"],
  ["tools","topic:developer-tools"],["tools","topic:cli"],
  ["ai","topic:machine-learning"],["ai","topic:llm"],
@@ -13,13 +15,11 @@ const QUERIES=[
  ["web","topic:web-development"],["web","topic:frontend"],
  ["learning","topic:tutorial"],["learning","topic:education"],
  ["games","topic:game-engine"],["games","topic:gamedev"],
- ["games","topic:ps4"],["games","ps4 in:name"],["games","ps3 in:name"],
- ["ai","chatgpt in:name"],["games","minecraft in:name"],
  ["tools","telegram in:name"],["tools","discord in:name"],
  ["programming","linux in:name"],["programming","rust in:name"],
  ["web","react in:name"],["web","flutter in:name"],
  ["tools","api in:name"],["tools","bot in:name"],
- ["data","postgres in:name"],["ai","ollama in:name"]
+ ["data","postgres in:name"]
 ];
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 function classify(repo,fallback){
@@ -61,20 +61,45 @@ async function getJson(url){
   await sleep(Math.max(2500,retry,remaining==="0"?reset-Date.now():0,2**i*2500));
  }
 }
-async function upsert(rows){
- for(let i=0;i<rows.length;i+=200){
-  const part=rows.slice(i,i+200);
-  const res=await fetch(`${BASE}/rest/v1/repos?on_conflict=id`,{
-   method:"POST",headers:{apikey:KEY,Authorization:`Bearer ${KEY}`,
-    "Content-Type":"application/json","Content-Profile":"repo_radar",
-    Prefer:"resolution=merge-duplicates,return=minimal"},
-   body:JSON.stringify(part),signal:AbortSignal.timeout(60000)});
-  if(!res.ok)throw Error(`Supabase upsert ${res.status}: ${await res.text()}`);
+// Small, independently committed batches avoid PostgreSQL statement timeouts.
+// Retry transient failures, split timed-out batches, and never report success
+// when any collected repository has not reached Supabase.
+async function upsertBatch(part){
+ let lastError;
+ for(let attempt=0;attempt<3;attempt++){
+  try{
+   const res=await fetch(`${BASE}/rest/v1/repos?on_conflict=id`,{
+    method:"POST",headers:{apikey:KEY,Authorization:`Bearer ${KEY}`,
+     "Content-Type":"application/json","Content-Profile":"repo_radar",
+     Prefer:"resolution=merge-duplicates,return=minimal"},
+    body:JSON.stringify(part),signal:AbortSignal.timeout(60000)});
+   if(res.ok)return;
+   const detail=(await res.text()).slice(0,1200);
+   lastError=new Error(`Supabase upsert ${res.status}: ${detail}`);
+   // A query timeout is generally caused by batch size; split immediately.
+   if(part.length>1&&(res.status===500||detail.includes("57014")))break;
+   if(![408,429,500,502,503,504].includes(res.status))throw lastError;
+  }catch(error){
+   lastError=error;
+   if(error.message?.includes("Supabase upsert 4")&&!error.message.includes("429"))throw error;
+  }
+  if(attempt<2)await sleep(1200*2**attempt);
  }
+ if(part.length>1){
+  const middle=Math.floor(part.length/2);
+  await upsertBatch(part.slice(0,middle));
+  await upsertBatch(part.slice(middle));
+  return;
+ }
+ throw lastError??Error("Single-row Supabase upsert failed");
+}
+async function upsert(rows){
+ for(let i=0;i<rows.length;i+=12)await upsertBatch(rows.slice(i,i+12));
 }
 const recent=Date.now()/3600000|0;
 const sort=recent%2===0?"stars":"updated";
 const collected=new Map();
+const persisted=new Set();
 let successful=0;
 for(const [category,search] of QUERIES){
  const q=`${search} fork:false archived:false stars:>=2`;
@@ -82,14 +107,17 @@ for(const [category,search] of QUERIES){
  try{
   const results=await getJson(url);
   successful++;
+  const fresh=[];
   for(const repo of results.items||[]){
-   if(repo.id&&repo.name&&repo.html_url&&!repo.fork&&!repo.archived)
-    collected.set(repo.id,row(repo,category));
+   if(!repo.id||!repo.name||!repo.html_url||repo.fork||repo.archived)continue;
+   collected.set(repo.id,row(repo,category));
+   if(!persisted.has(repo.id))fresh.push(row(repo,category));
   }
-  console.log(`${search}: ${results.items?.length||0} matches`);
+  await upsert(fresh);
+  for(const item of fresh)persisted.add(item.id);
+  console.log(`${search}: ${results.items?.length||0} matches; ${fresh.length} saved`);
  }catch(error){console.error(`Search failed (${search}): ${error.message}`);}
  await sleep(2400);
 }
 if(successful===0)throw new Error("All GitHub discovery searches failed.");
-await upsert([...collected.values()]);
 console.log(`Discovery complete: ${collected.size} unique original repositories, ${successful}/${QUERIES.length} queries succeeded.`);
