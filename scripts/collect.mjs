@@ -106,7 +106,7 @@ async function upsertBatch(part){
 async function upsert(rows){
  for(let i=0;i<rows.length;i+=12)await upsertBatch(rows.slice(i,i+12));
 }
-// Guaranteed catalog entries for the two official sites, regardless of stars.
+// Guaranteed hand-picked project entries, regardless of stars.
 // Keep this list intentionally small; it is not an account-wide bulk import.
 const featuredOriginals=[
  {fullName:"dnestruev/messenger",category:"tools",
@@ -114,7 +114,10 @@ const featuredOriginals=[
   fallbackDescription:"Веб-мессенджер для обмена сообщениями"},
  {fullName:"Peteroxhka/repo-radar",category:"web",
   homepage:"https://peteroxhka.github.io/repo-radar/",
-  fallbackDescription:"Каталог проектов GitHub с поиском, категориями и сообществом"}
+  fallbackDescription:"Каталог проектов GitHub с поиском, категориями и сообществом"},
+ {fullName:"Akela-x/ps4freeforall",category:"console_webkit",
+  homepage:"https://akela-x.github.io/ps4freeforall/",
+  fallbackDescription:"PS4 WebKit — интерактивная страница проекта"}
 ];
 async function syncFeaturedOriginals(){
  const toSave=[];
