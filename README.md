@@ -4,8 +4,10 @@ GitHub open-source discovery feed + community features. A responsive static app 
 
 ## Included
 
-- Original discovery feed (collector still updates it every six hours)
-- Modern responsive layout; dark, light, and cosmic themes; theme saved on the device
+- Large public GitHub repository catalog, imported incrementally from GitHub's official public-repositories endpoint
+- Discovery feed refreshed with popular, recently active projects every six hours
+- Responsive catalog with server-side search, language/category filters, and pagination
+- Dark, light, and cosmic themes; theme saved on the device
 - Language switcher: English, Russian, Spanish, French, German, Portuguese, Chinese, Japanese, Korean, Arabic, Hindi and Turkish. English fallback is used for untranslated strings. **Not all languages in the world are translated yet.**
 - Supabase Auth: GitHub OAuth or email/password signup, email confirmation, account sign-out
 - Public profile username; custom uploaded avatar for email accounts; GitHub OAuth users see their GitHub avatar
@@ -16,14 +18,22 @@ GitHub open-source discovery feed + community features. A responsive static app 
 
 1. Open the Supabase project referenced in `config.js` (its URL and publishable key are browser-safe). Back up the database.
 2. Run `supabase/migrations/20261112_community.sql` in the **Supabase SQL Editor** with a privileged project administrator. This creates profiles, messages, storage buckets and RLS. It does not delete the existing `repo_radar.repos` feed.
-3. In Supabase **Settings → API → Exposed schemas**, add `repo_radar` if it isn't already exposed.
-4. In **Authentication → Providers**, enable Email and GitHub. For GitHub OAuth, create a GitHub OAuth App with its callback URL set to the **Supabase Auth callback** provided by Supabase (usually `https://<project-ref>.supabase.co/auth/v1/callback`). Store the OAuth client secret only in Supabase; do **not** commit it. Set the site's origin and full GitHub Pages URL as allowed redirects in **Authentication → URL Configuration**.
-5. On GitHub Pages, make sure **Settings → Pages → Source = GitHub Actions**. The existing `pages.yml` publishes `main` automatically.
-6. Test with two separate accounts: email signup, GitHub sign-in, avatar upload, messages in both directions, a 25-MB-or-smaller document attachment, and verify a third account cannot read either user's messages or attachments.
-7. Keep GitHub Actions secret `SUPABASE_SERVICE_KEY` for the existing `Collect repositories` job. Never use the service key in client-side files.
+3. Run `supabase/migrations/20261112_public_catalog.sql`. It adds metadata columns and a private cursor table for resumable bulk import. It does not delete existing repositories.
+4. In Supabase **Settings → API → Exposed schemas**, add `repo_radar` if it isn't already exposed. Keep `collector_state` inaccessible to `anon` and `authenticated`; only the service role needs it.
+5. In **Authentication → Providers**, enable Email and GitHub. For GitHub OAuth, create a GitHub OAuth App with its callback URL set to the **Supabase Auth callback** provided by Supabase (usually `https://<project-ref>.supabase.co/auth/v1/callback`). Store the OAuth client secret only in Supabase; do **not** commit it. Set the site's origin and full GitHub Pages URL as allowed redirects in **Authentication → URL Configuration**.
+6. On GitHub Pages, make sure **Settings → Pages → Source = GitHub Actions**. The existing `pages.yml` publishes `main` automatically.
+7. In GitHub **Settings → Secrets and variables → Actions**, set `SUPABASE_SERVICE_KEY` to a current secret/service-role key from the exact Supabase project in `config.js`. Never put this key in `config.js` or commit it. The public browser only uses the publishable key.
+8. Run **Actions → Collect repositories → Run workflow**. Each run imports up to 25,500 public repositories (850 API pages × 30 items) and saves its cursor. The six-hour schedule continues the import automatically; after the first 100,000+ records, it keeps indexing newly created public repositories. The importer uses GitHub's official `GET /repositories?since=<last-repository-id>` endpoint, which lists public repositories in creation order. The built-in `GITHUB_TOKEN` is limited to 1,000 REST requests per hour per repository, so each run reserves headroom and resumes in the next run.
+9. Test with two separate accounts: email signup, GitHub sign-in, avatar upload, messages in both directions, a 25-MB-or-smaller document attachment, and verify a third account cannot read either user's messages or attachments.
 
-**Limitations**: Uploads are limited to 25 MB and allowlisted file formats. The storage policy is designed to prevent casual cross-user access; for production-scale moderation or malware checks, introduce a dedicated scanning and abuse-reporting workflow. Messages are protected by Supabase RLS but are **not end-to-end encrypted**. Localizations need native-speaker review. Passwords are handled by Supabase Auth, not stored by Repo Radar.
+## Catalog notes
 
-## Existing discovery feed
+- This is a real metadata index of public GitHub repositories, not a clone of GitHub's code or Git objects. It stores repository IDs, names, descriptions, topics, languages, stars, license identifiers, dates, and basic repository statistics.
+- Public GitHub repositories are not automatically open source. A missing `license_spdx` means GitHub did not identify a repository license; check the repository's own terms before reusing its code.
+- The public-repository endpoint paginates by repository ID. The importer persists the last ID only after the corresponding rows have been committed, so interrupted runs resume safely. Existing rows are merged by GitHub repository ID.
+- The bulk list is ordered by creation date; the separate topic searches refresh popular, recently active projects so the top of the feed remains useful while the historical catalog is growing.
+- GitHub API and Supabase limits apply. The importer is deliberately incremental rather than trying to make thousands of unbounded calls in one workflow run.
 
-The `Collect repositories` workflow fetches GitHub Search data into `repo_radar.repos` every six hours, filtering unlicensed or unsuitable repos. The frontend reads this data with the public Supabase publishable key. This is kept as-is.
+## Limitations
+
+Uploads are limited to 25 MB and allowlisted file formats. The storage policy is designed to prevent casual cross-user access; for production-scale moderation or malware checks, introduce a dedicated scanning and abuse-reporting workflow. Messages are protected by Supabase RLS but are **not end-to-end encrypted**. Localizations need native-speaker review. Passwords are handled by Supabase Auth, not stored by Repo Radar.
