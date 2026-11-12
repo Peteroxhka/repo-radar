@@ -45,6 +45,7 @@ $$;
 drop trigger if exists repo_radar_on_auth_user_created on auth.users;
 create trigger repo_radar_on_auth_user_created
 after insert on auth.users for each row execute function repo_radar.create_profile_for_new_user();
+revoke all on function repo_radar.create_profile_for_new_user() from public, anon, authenticated;
 
 insert into repo_radar.profiles(id, username, avatar_url)
 select id,'u_' || substr(replace(id::text,'-',''),1,20),raw_user_meta_data->>'avatar_url'
