@@ -36,6 +36,16 @@
 
 **Важно:** упоминание версии в репозитории или наличие варианта в фильтре **не является доказательством совместимости** с определённой консолью или прошивкой. Сайт не запускает код из найденных репозиториев.
 
+### Console Hub — определение консоли
+
+На главной странице есть отдельная кнопка **«Консольный центр»**, ведущая на [Console Hub](console-hub.html). Поддерживается определение браузеров PS3, PS4, PS5, PS Vita, Wii U, Nintendo Switch и Xbox, а также ручной выбор консоли на случай, если браузер скрывает модель.
+
+- Автоматическая проверка читает только `navigator.userAgent`. Некоторые версии PS4 и PS5 сообщают предполагаемую прошивку в этой строке.
+- Если прошивка не обнаружена, её можно указать вручную. **Ни автоматический, ни ручной ввод не гарантируют фактической совместимости стороннего проекта.**
+- Кнопка каталога открывает проекты выбранной консоли; если устройство неизвестно, доступна полная консольная подборка.
+- Console Hub использует обычный JavaScript без современных фреймворков для лучшей совместимости со старыми браузерами.
+- **Console Hub не запускает эксплойты, джейлбрейк или обход защиты:** это диагностическая и информационная страница.
+
 ### Карточки и описание проекта
 
 Нажатие на карточку открывает окно с плавной анимацией. В нём находятся:
@@ -71,6 +81,9 @@
 **Ограничения:** зашифрованные файлы до 15 МБ, текст примерно до 2600 символов (или меньше для многобайтовых символов). Старые сообщения остаются незашифрованными. Имена, размеры и MIME-типы файлов, участники переписки и время сообщений остаются видимыми серверу. Общий секрет не подтверждает личность собеседника; проверка безопасности независимыми аудиторами не проводилась. Приложение не следует считать полноценным защищённым мессенджером.
 
 ### Просмотр вложений
+
+Кнопка «+» открывает **встроенное меню вложений**: фото, видео, музыка и аудио, документы и файлы. На телефоне после выбора типа откроется системный файловый интерфейс, которым управляют Android/iOS и браузер. Сайт не может принудительно заменить оформление системного окна выбора приложения.
+
 
 Изображения и поддерживаемые видео и аудиофайлы отображаются **непосредственно в переписке** с обычными браузерными элементами просмотра. Для PDF, документов и архивов предусмотрена карточка с оригинальным именем файла, размером и кнопкой открытия. Файлы остаются в закрытом Supabase Storage, доступ к ним выдаётся через короткоживущие подписанные ссылки. Зашифрованные файлы расшифровываются локально в браузере.
 
@@ -156,6 +169,16 @@ The dedicated Console WebKit category groups repositories whose published metada
 
 **Compatibility warning:** a firmware version shown in metadata or offered as a filter is **not independent confirmation of compatibility**. Repo Radar does not execute code from indexed repositories.
 
+### Console Hub — platform and firmware hints
+
+The homepage has a dedicated **[Console Hub](console-hub.html)** button. It supports conservative browser identification and manual console selection for PS3, PS4, PS5, PS Vita, Wii U, Nintendo Switch, and Xbox.
+
+- Automatic identification inspects only `navigator.userAgent`; some PS4/PS5 browsers include a **firmware hint** in this value.
+- Visitors can manually select a platform and provide a firmware number when automatic identification fails. **Neither a user-agent hint nor a manually entered version proves actual project compatibility.**
+- The catalog link opens matching platform projects. If no console is detected or selected, it opens the overall console collection.
+- The standalone page uses classic JavaScript for broader legacy browser support.
+- **Console Hub does not run exploits, jailbreaks, or security bypasses:** it is a read-only diagnostics and discovery interface.
+
 ### Project detail view
 
 Selecting a project opens a smoothly animated detail panel containing:
@@ -191,6 +214,9 @@ Ordinary direct messages are protected by Supabase RLS but **are not end-to-end 
 **Limits and caveats:** encrypted files are limited to 15 MB and text to approximately 2,600 characters (fewer for multibyte Unicode). Earlier messages remain plaintext. The server still sees sender/recipient IDs, timestamps, original filenames, MIME types, and file sizes. Shared secrets do not independently authenticate the other person; the implementation has not undergone independent security auditing. Do not treat this prototype as a fully audited secure messenger.
 
 ### Native attachment previews
+
+The "+" button opens a **custom attachment menu** with photos, videos, music/audio, and documents/files. On mobile, the browser/operating system still owns the native picker shown after the selection; a website cannot force a particular system app chooser.
+
 
 Images appear as inline previews, video and audio play using browser controls, and PDFs, archives, and documents use a card showing the original filename, file size, and an open action. Existing files remain in a private Supabase Storage bucket with temporary signed URLs. Encrypted files are decrypted locally before being displayed or downloaded.
 

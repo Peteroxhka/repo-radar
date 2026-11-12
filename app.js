@@ -203,6 +203,22 @@ Object.assign(translations.en,{
  chatEncryptionLostSecret:"Encrypted messages cannot be recovered without the shared secret."
 });
 
+Object.assign(translations.en,{
+ consoleHubCta:"Console Hub",
+ attachChoose:"Attach something",
+ attachPhoto:"Photos",
+ attachVideo:"Videos",
+ attachAudio:"Music and audio",
+ attachFile:"Documents and files"
+});
+Object.assign(translations.ru,{
+ consoleHubCta:"Консольный центр",
+ attachChoose:"Что прикрепить?",
+ attachPhoto:"Фото",
+ attachVideo:"Видео",
+ attachAudio:"Музыка и аудио",
+ attachFile:"Документы и файлы"
+});
 const categoryKeys=["all","programming","tools","ai","data","web","learning","games","console_webkit","other"];
 const localeNames={ru:"Русский",en:"English",es:"Español",fr:"Français",de:"Deutsch",pt:"Português",zh:"中文",ja:"日本語",ko:"한국어",ar:"العربية",hi:"हिन्दी",tr:"Türkçe"};
 const allowedExt=new Set(["jpg","jpeg","png","webp","gif","bmp","heic","mp4","webm","mov","m4v","mp3","ogg","wav","m4a","aac","flac","pdf","txt","md","csv","json","doc","docx","xls","xlsx","ppt","pptx","odt","ods","odp","zip","7z","rar"]);
@@ -212,6 +228,15 @@ let locale=localStorage.getItem("radar-locale")||"en";
 if(!translations[locale])locale="en";
 let theme=localStorage.getItem("radar-theme")||"dark";if(!["dark","light","cosmic"].includes(theme))theme="dark";
 let state={chatEpoch:0,messageBusy:false,historyCursor:null,historyMore:false,contactRequest:0,category:"all",language:"",search:"",sort:"popular",includeDescription:false,consoleFilters:{console:"",version:"",firmwareVersion:"",firmwareType:""},consoleRows:null,user:null,profile:null,peer:null,allRows:[],totalCount:0,catalogTotal:0,categoryCounts:{},categoryCountsLoaded:false,hasMore:true,loading:false,languageOptions:[],languageOptionsLoaded:false,listRequestId:0,searchTimer:null,seen:new Map(),sub:null,refreshTimer:null,register:false,adminAuthorized:false};
+// The console hub is a read-only identification page. Accept only
+// known names so a query parameter cannot inject arbitrary filter values.
+try{
+ const fromHub=new URL(location.href).searchParams.get("console");
+ if(["PS3","PS4","PS5","PS Vita","Wii U","Nintendo Switch","Xbox"].includes(fromHub)){
+  state.category="console_webkit";
+  state.consoleFilters.console=fromHub;
+ }
+}catch(err){console.warn("Unable to read console selection",err);}
 let adminAccessEpoch=0,detailRequestEpoch=0;
 let chatCryptoSession=null;
 const chatUrlCache=new Map();
@@ -732,7 +757,7 @@ function stopChat(){
  $("chat-app").classList.remove("has-peer");
  $("chat-peer-avatar").replaceChildren("?");state.lastRenderedSignature=null;
  updateChatSecurity();
- setStatus("chat-status","");$("file-input").disabled=true;state.chatEpoch+=1;state.contactRequest+=1;state.messageBusy=false;state.historyCursor=null;state.historyMore=false;$("chat-history").hidden=true;$("message-input").value="";$("file-input").value="";clearFileSelection();
+ setStatus("chat-status","");closeAttachmentMenu();$("attachment-toggle").disabled=true;$("file-input").disabled=true;state.chatEpoch+=1;state.contactRequest+=1;state.messageBusy=false;state.historyCursor=null;state.historyMore=false;$("chat-history").hidden=true;$("message-input").value="";$("file-input").value="";clearFileSelection();
  delete $("chat-messages").dataset.lastId;if(state.sub){sb.removeChannel(state.sub);state.sub=null;}if(state.refreshTimer){clearInterval(state.refreshTimer);state.refreshTimer=null;}state.peer=null;state.seen.clear();$("chat-messages").replaceChildren();$("conversation-list").replaceChildren();$("chat-partner").textContent=t("chooseChat");$("message-input").disabled=true;$("message-send").disabled=true;}
 async function onSession(){const{data:{user}}=await sb.auth.getUser();const previous=state.user?.id;state.user=user||null;if(previous&&previous!==user?.id)stopChat();if(!user)stopChat();
 $("auth-open").classList.toggle("hidden",!!user);$("profile-open").classList.toggle("hidden",!user);$("chat-guest").classList.toggle("hidden",!!user);$("chat-app").classList.toggle("hidden",!user);
@@ -785,7 +810,7 @@ $("chat-partner").textContent="@"+person.username;
  avatar($("chat-peer-avatar"),person.avatar_url,person.username);
  $("chat-app").classList.add("has-peer");
  updateChatSecurity();
- $("file-input").disabled=false;$("message-input").disabled=false;$("message-send").disabled=false;
+ $("file-input").disabled=false;$("attachment-toggle").disabled=false;$("message-input").disabled=false;$("message-send").disabled=false;
 const current=()=>isCurrentChat(state,epoch,userId,person.id);
 // Install resources before awaiting requests: a new selection can always clean them up.
 state.sub=sb.channel("radar-dm-"+userId+"-"+epoch).on("postgres_changes",{event:"INSERT",schema:"repo_radar",table:"direct_messages",filter:"recipient_id=eq."+userId},()=>{if(current()){loadMessages();loadContacts();}}).subscribe();
@@ -998,6 +1023,51 @@ let selectedChatFile=null;
 function clearFileSelection(){
  selectedChatFile=null;clearSelectedFile();
 }
+// Custom in-page attachment chooser. Android/iOS still own the final native
+// file picker; the website must not claim to replace OS-level picker dialogs.
+const ATTACHMENT_ACCEPT={
+ photo:"image/jpeg,image/png,image/webp,image/gif,image/bmp,image/heic",
+ video:"video/mp4,video/webm,video/quicktime,.mov,.m4v",
+ audio:"audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/aac,.flac",
+ file:""
+};
+function closeAttachmentMenu(restoreFocus=false){
+ const menu=$("attachment-menu"),button=$("attachment-toggle");
+ menu.classList.add("hidden");button.setAttribute("aria-expanded","false");
+ if(restoreFocus)button.focus();
+}
+$("attachment-toggle").onclick=()=>{
+ if($("attachment-toggle").disabled||!state.peer)return;
+ const menu=$("attachment-menu"),open=menu.classList.contains("hidden");
+ menu.classList.toggle("hidden",!open);
+ $("attachment-toggle").setAttribute("aria-expanded",String(open));
+ if(open)menu.querySelector('[role="menuitem"]')?.focus();
+};
+$("attachment-menu").querySelectorAll("[data-file-kind]").forEach(button=>{
+ button.onclick=()=>{
+  const kind=button.dataset.fileKind;
+  if(!Object.prototype.hasOwnProperty.call(ATTACHMENT_ACCEPT,kind))return;
+  closeAttachmentMenu();
+  const input=$("file-input");
+  if(input.disabled||!state.peer)return;
+  input.value="";
+  input.removeAttribute("capture");
+  input.accept=ATTACHMENT_ACCEPT[kind];
+  // Calling click directly from this actual user event keeps mobile browsers'
+  // file-picker permission and avoids a surprise OS intent chooser on + tap.
+  input.click();
+ };
+});
+document.addEventListener("pointerdown",event=>{
+ if($("attachment-menu").classList.contains("hidden"))return;
+ if($("attachment-menu").contains(event.target)||$("attachment-toggle").contains(event.target))return;
+ closeAttachmentMenu();
+});
+document.addEventListener("keydown",event=>{
+ if(event.key==="Escape"&&!$("attachment-menu").classList.contains("hidden")){
+  event.preventDefault();closeAttachmentMenu(true);
+ }
+});
 $("file-input").onchange=()=>{
  const file=$("file-input").files[0];
  if(selectedPreviewUrl){URL.revokeObjectURL(selectedPreviewUrl);selectedPreviewUrl=null;}

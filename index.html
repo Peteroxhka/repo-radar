@@ -51,7 +51,7 @@
         <div class="eyebrow"><span class="pulse"></span><span data-i18n="eyebrow">ОТКРЫТЫЙ КОД. НОВЫЕ ИДЕИ.</span></div>
         <h1 data-i18n="headline">Находи свой следующий <em>любимый проект.</em></h1>
         <p class="lead" data-i18n="tagline">Лучшие открытые репозитории GitHub в одной красивой ленте. Обновление каждые шесть часов.</p>
-        <div class="hero-actions"><a href="#repos" class="button button-primary" data-i18n="explore">Исследовать проекты</a><span class="hero-stat"><strong id="repo-count">—</strong> <span data-i18n="projects">проектов</span></span></div>
+        <div class="hero-actions"><a href="#repos" class="button button-primary" data-i18n="explore">Исследовать проекты</a><a href="./console-hub.html" class="button button-outline console-hub-cta" data-i18n="consoleHubCta">Console Hub</a><span class="hero-stat"><strong id="repo-count">—</strong> <span data-i18n="projects">проектов</span></span></div>
         <div class="hero-shine" aria-hidden="true"></div>
       </section>
       <aside class="official-feature" aria-label="Official project repository">
@@ -128,8 +128,15 @@
    <div class="chat-messages" id="chat-messages" aria-live="polite"><div class="chat-welcome"><span aria-hidden="true">✧</span><h3 data-i18n="chooseChat">Choose a conversation</h3><p data-i18n="chatWelcomeHint">Select a contact to begin.</p></div></div>
    <div id="file-preview" class="chat-file-preview hidden"></div>
    <form id="message-form" class="message-form">
-    <input id="file-input" class="sr-only" type="file" accept="image/*,video/*,audio/*,.pdf,.txt,.md,.csv,.json,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.zip,.7z,.rar">
-    <label for="file-input" class="attach-btn" title="Attach file" aria-label="Attach file">＋</label>
+    <input id="file-input" class="sr-only" type="file" accept="">
+    <button id="attachment-toggle" class="attach-btn" type="button" aria-haspopup="menu" aria-controls="attachment-menu" aria-expanded="false" aria-label="Attach file" title="Attach file" disabled>＋</button>
+    <div id="attachment-menu" class="attachment-menu hidden" role="menu" aria-label="Choose an attachment">
+      <p class="attachment-menu-heading" data-i18n="attachChoose">Choose an attachment</p>
+      <button type="button" role="menuitem" data-file-kind="photo"><span aria-hidden="true">🖼️</span><span data-i18n="attachPhoto">Photos</span></button>
+      <button type="button" role="menuitem" data-file-kind="video"><span aria-hidden="true">🎬</span><span data-i18n="attachVideo">Videos</span></button>
+      <button type="button" role="menuitem" data-file-kind="audio"><span aria-hidden="true">🎵</span><span data-i18n="attachAudio">Music and audio</span></button>
+      <button type="button" role="menuitem" data-file-kind="file"><span aria-hidden="true">📁</span><span data-i18n="attachFile">Documents and files</span></button>
+    </div>
     <textarea id="message-input" rows="1" maxlength="4000" autocomplete="off" placeholder="Write a message..." disabled></textarea>
     <button id="message-send" class="button button-primary" type="submit" disabled data-i18n="send">Send</button>
    </form>

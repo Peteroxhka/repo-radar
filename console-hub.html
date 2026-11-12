@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+ <meta name="color-scheme" content="dark">
+ <meta name="description" content="Repo Radar Console Hub — detect a console browser, check reported firmware, and browse console-related open source projects.">
+ <title>Console Hub · Repo Radar</title>
+ <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+ <link rel="stylesheet" href="./console-hub.css">
+ <script defer src="./lib/console-detect.js"></script>
+ <script defer src="./console-hub.js"></script>
+</head>
+<body>
+ <div class="ambient" aria-hidden="true"></div>
+ <header class="topbar">
+  <a class="brand" href="./"><span class="brand-mark">R<span class="brand-dot">.</span></span>repo<span class="brand-thin">radar</span></a>
+  <nav class="top-nav"><a href="./" id="nav-home">← Return to catalog</a><span class="nav-mark">CONSOLE HUB</span></nav>
+ </header>
+ <main class="layout">
+  <section class="hero" aria-labelledby="main-title">
+   <div class="eyebrow"><span class="spark"></span><span id="hero-eyebrow">CONSOLE · BROWSER · FIRMWARE</span></div>
+   <h1 id="main-title">Explore your <em>console browser.</em></h1>
+   <p id="hero-summary">Identify your console browser where possible, check its reported firmware and find relevant open-source projects in Repo Radar.</p>
+   <div class="hero-footer"><span class="trust-pill"><span class="trust-icon">✓</span><span id="no-exploit">Read-only diagnostics. No exploits are executed.</span></span></div>
+  </section>
+  <section class="status-panel" aria-labelledby="detection-title">
+   <div class="section-heading"><div><p class="section-kicker" id="detector-kicker">AUTOMATIC DETECTION</p><h2 id="detection-title">Your device</h2></div><span class="section-number">01 / 03</span></div>
+   <div class="autodetect-grid">
+    <div class="detection-metric"><span id="device-label">Detected console</span><strong id="detected-console">Checking…</strong><small id="device-hint"></small></div>
+    <div class="detection-metric"><span id="firmware-label">Firmware hint</span><strong id="detected-firmware">—</strong><small id="firmware-hint"></small></div>
+    <div class="detection-metric"><span id="browser-label">Browser engine hint</span><strong id="detected-browser">—</strong><small id="browser-hint"></small></div>
+   </div>
+   <p class="notice" id="notice-ua">Browser identification uses the user-agent string, which can be missing or inaccurate. Firmware is never confirmed by a webpage alone.</p>
+  </section>
+  <section class="selection-panel" aria-labelledby="select-title">
+   <div class="section-heading"><div><p class="section-kicker" id="selector-kicker">CHOOSE A PLATFORM</p><h2 id="select-title">Console selection</h2></div><span class="section-number">02 / 03</span></div>
+   <div class="console-grid" id="console-list" role="group" aria-label="Console models">
+    <button class="console-choice" type="button" data-console="PS3"><span class="console-glyph">03</span><strong>PlayStation 3</strong></button>
+    <button class="console-choice" type="button" data-console="PS4"><span class="console-glyph">04</span><strong>PlayStation 4</strong></button>
+    <button class="console-choice" type="button" data-console="PS5"><span class="console-glyph">05</span><strong>PlayStation 5</strong></button>
+    <button class="console-choice" type="button" data-console="PS Vita"><span class="console-glyph">V</span><strong>PS Vita</strong></button>
+    <button class="console-choice" type="button" data-console="Wii U"><span class="console-glyph">W</span><strong>Wii U</strong></button>
+    <button class="console-choice" type="button" data-console="Nintendo Switch"><span class="console-glyph">N</span><strong>Nintendo Switch</strong></button>
+    <button class="console-choice" type="button" data-console="Xbox"><span class="console-glyph">X</span><strong>Xbox</strong></button>
+   </div>
+   <div class="manual-row">
+    <div class="manual-field"><label for="firmware-manual" id="manual-firmware-label">Firmware (optional)</label>
+     <input id="firmware-manual" placeholder="e.g. 9.00 or 14.02" type="text" maxlength="8" inputmode="decimal" autocomplete="off" spellcheck="false">
+    </div>
+    <button id="detect-again" class="secondary-button" type="button">Detect again</button>
+   </div>
+   <p id="firmware-validation" class="small-note" role="status"></p>
+  </section>
+  <section class="result-panel" aria-labelledby="results-title">
+   <div class="section-heading"><div><p class="section-kicker" id="results-kicker">NEXT STEPS</p><h2 id="results-title">Explore related projects</h2></div><span class="section-number">03 / 03</span></div>
+   <div class="result-card">
+    <div class="result-content">
+     <span class="result-overline" id="selected-caption">SELECTED CONSOLE</span>
+     <h3 id="selected-title">Choose your console</h3>
+     <p id="selected-description">Pick a console above. This page will point you to relevant catalog projects and show the detected firmware hint, if one was available.</p>
+     <p class="firmware-line" id="selected-firmware"></p>
+    </div>
+    <a class="primary-button disabled" id="open-projects" href="./?category=console_webkit" aria-disabled="true">Browse console projects ↗</a>
+   </div>
+   <p class="notice note-small" id="safety-note">Listed projects are third-party sources and may be outdated. A matching firmware number is not proof of compatibility. This website does not perform a jailbreak or bypass console security.</p>
+  </section>
+  <footer class="footer"><a href="./">Repo Radar</a><span id="footer-tagline">Independent open-source project catalog</span><span>Build <code>__BUILD_SHA__</code></span></footer>
+ </main>
+</body>
+</html>

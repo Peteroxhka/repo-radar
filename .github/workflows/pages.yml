@@ -28,6 +28,8 @@ jobs:
           node --check lib/core.mjs
           node --check lib/catalog.mjs
           node --check lib/console-filters.mjs
+          node --check lib/console-detect.js
+          node --check console-hub.js
           node --check lib/official-info.mjs
           node --check lib/chat-crypto.mjs
           node --check lib/attachment-ui.mjs

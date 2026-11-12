@@ -427,3 +427,57 @@ body[data-theme=cosmic] .hero h1{text-shadow:0 0 16px rgba(189,243,199,.12)}
  .chat-key-controls input,.chat-key-controls button{width:100%}
 }
 @media(prefers-reduced-motion:reduce){.chat-modern .message,.chat-encryption-panel{animation:none!important}.chat-modern .conversation{transition:none}}
+
+/* Attachment type picker: custom in-page menu, not Android intent resolver. */
+.chat-modern .message-form{position:relative}
+.attachment-menu{
+ position:absolute;left:15px;bottom:calc(100% + 9px);z-index:40;
+ width:min(320px,calc(100vw - 44px));max-height:min(380px,55dvh);
+ overflow:auto;padding:8px;
+ border:1px solid var(--border);border-radius:18px;
+ background:var(--surface);color:var(--text);
+ box-shadow:0 22px 66px rgba(0,0,0,.30);
+ animation:attachmentMenuOpen .20s cubic-bezier(.2,.85,.3,1) both;
+}
+.attachment-menu.hidden{display:none!important}
+.attachment-menu-heading{
+ margin:0;padding:8px 11px 11px;font-size:11px;font-weight:800;
+ letter-spacing:.04em;color:var(--muted);
+}
+.attachment-menu [role="menuitem"]{
+ display:flex;align-items:center;gap:13px;width:100%;min-height:55px;
+ padding:8px 12px;border:0;border-radius:12px;background:transparent;
+ color:var(--text);text-align:left;font-weight:700;cursor:pointer;
+ font-size:14px;transition:background .17s ease,color .17s ease;
+}
+.attachment-menu [role="menuitem"]:hover,
+.attachment-menu [role="menuitem"]:focus-visible{
+ background:color-mix(in srgb,var(--accent) 13%,var(--surface2));
+ outline:2px solid transparent;color:var(--accent);
+}
+.attachment-menu [role="menuitem"]>span:first-child{
+ width:38px;height:38px;flex:none;display:grid;place-items:center;
+ border-radius:11px;background:var(--surface2);font-size:21px;
+}
+.chat-modern .attach-btn:disabled{opacity:.4;cursor:not-allowed}
+@keyframes attachmentMenuOpen{
+ from{opacity:0;transform:translateY(8px) scale(.98)}
+ to{opacity:1;transform:translateY(0) scale(1)}
+}
+@media(max-width:760px){
+ .attachment-menu{left:8px;bottom:calc(100% + 5px)}
+ .attachment-menu [role="menuitem"]{min-height:60px}
+}
+@media(prefers-reduced-motion:reduce){
+ .attachment-menu{animation:none!important}
+ .attachment-menu [role="menuitem"]{transition:none}
+}
+/* Dedicated read-only console page entry in the home hero. */
+.console-hub-cta{
+ white-space:nowrap;
+ border-color:color-mix(in srgb,var(--accent) 50%,var(--border));
+ background:color-mix(in srgb,var(--accent) 9%,transparent);
+}
+@media(max-width:480px){
+ .console-hub-cta{width:100%;text-align:center;justify-content:center}
+}
