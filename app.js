@@ -60,9 +60,7 @@ Object.assign(translations.en,{
  adminSummaryTotal:"Indexed repositories",adminSummaryVisible:"Visible projects",adminSummaryHidden:"Hidden projects",
  adminSummaryWebkit:"Console WebKit",adminSummaryUsers:"Registered users",adminSummaryMessages:"Messages",
  repoDetails:"Project details",viewDetails:"View details",sourceCode:"Source on GitHub",projectAuthor:"Author",
- projectScreenshots:"Screenshots from GitHub",screenshotsLoading:"Checking GitHub README for screenshots...",
- screenshotsNone:"No screenshots found in the project README.",screenshotsUnavailable:"Screenshots are temporarily unavailable.",
- refreshLatest:"Load latest version"
+  refreshLatest:"Load latest version"
 });
 Object.assign(translations.ru,{
  adminPanel:"Админка",adminIntro:"Состояние каталога и обратимая модерация. Только для подтверждённого владельца сайта.",
@@ -73,9 +71,7 @@ Object.assign(translations.ru,{
  adminSummaryTotal:"Репозиториев в базе",adminSummaryVisible:"Видимых проектов",adminSummaryHidden:"Скрытых проектов",
  adminSummaryWebkit:"Консольные WebKit",adminSummaryUsers:"Пользователей",adminSummaryMessages:"Сообщений",
  repoDetails:"О проекте",viewDetails:"Подробнее",sourceCode:"Исходники на GitHub",projectAuthor:"Автор",
- projectScreenshots:"Скриншоты из GitHub",screenshotsLoading:"Ищем скриншоты в GitHub README...",
- screenshotsNone:"В README нет скриншотов.",screenshotsUnavailable:"Не удалось загрузить скриншоты.",
- refreshLatest:"Загрузить новую версию"
+  refreshLatest:"Загрузить новую версию"
 });
 
 Object.assign(translations.en,{
