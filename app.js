@@ -78,7 +78,7 @@ setStatus("status",`${state.allRows.length.toLocaleString(locale)} / ${state.tot
 catch(e){
 if(requestId!==state.listRequestId)return;
 setStatus("status",safeErr(e),true);
-more.hidden=reset||!state.hasMore;
+more.hidden=!state.hasMore;
 if(reset)$("grid").replaceChildren();
 }
 finally{
