@@ -16,15 +16,16 @@ ar:{discover:"استكشف",messages:"الرسائل",signIn:"دخول",darkThem
 hi:{discover:"खोजें",messages:"संदेश",signIn:"लॉग इन",darkTheme:"डार्क",lightTheme:"लाइट",cosmicTheme:"कॉस्मिक",eyebrow:"ओपन सोर्स. नए विचार.",headline:"अपना अगला <em>पसंदीदा प्रोजेक्ट</em> खोजें।",tagline:"GitHub प्रोजेक्ट हर छह घंटे में अपडेट होते हैं।",explore:"प्रोजेक्ट खोजें",projects:"प्रोजेक्ट",trending:"देखने लायक प्रोजेक्ट",all:"सभी",welcomeBack:"स्वागत है",yourMessages:"निजी संदेश",send:"भेजें",register:"साइन अप",username:"यूज़रनेम",password:"पासवर्ड",signOut:"लॉग आउट",yourProfile:"प्रोफ़ाइल",saveChanges:"सहेजें",startChat:"चैट शुरू करें"},
 tr:{discover:"Keşfet",messages:"Mesajlar",signIn:"Giriş",darkTheme:"Koyu",lightTheme:"Açık",cosmicTheme:"Kozmik",eyebrow:"AÇIK KAYNAK. YENİ FİKİRLER.",headline:"Yeni <em>favori projenizi</em> bulun.",tagline:"GitHub projeleri altı saatte bir güncellenir.",explore:"Projeleri keşfet",projects:"proje",trending:"Öne çıkan projeler",all:"Tümü",welcomeBack:"Hoş geldiniz",yourMessages:"Özel mesajlar",send:"Gönder",register:"Kaydol",username:"Kullanıcı adı",password:"Şifre",signOut:"Çıkış",yourProfile:"Profil",saveChanges:"Kaydet",startChat:"Sohbet başlat"}
 };
-const categoryKeys=["all","programming","tools","ai","data","web","learning","games"];
+const categoryKeys=["all","programming","tools","ai","data","web","learning","games","other"];
 const localeNames={ru:"Русский",en:"English",es:"Español",fr:"Français",de:"Deutsch",pt:"Português",zh:"中文",ja:"日本語",ko:"한국어",ar:"العربية",hi:"हिन्दी",tr:"Türkçe"};
 const allowedExt=new Set(["jpg","jpeg","png","webp","gif","bmp","heic","mp4","webm","mov","m4v","mp3","ogg","wav","m4a","aac","flac","pdf","txt","md","csv","json","doc","docx","xls","xlsx","ppt","pptx","odt","ods","odp","zip","7z","rar"]);
 const blockedMime=/x-msdownload|x-executable|x-sh|x-bat|x-dosexec|javascript|text\/html|svg\+xml/i;
 let locale=localStorage.getItem("radar-locale")||((navigator.language||"ru").slice(0,2));
 if(!translations[locale])locale="en";
 let theme=localStorage.getItem("radar-theme")||"dark";if(!["dark","light","cosmic"].includes(theme))theme="dark";
-let state={category:"all",language:"",search:"",user:null,profile:null,peer:null,allRows:[],totalCount:0,hasMore:true,loading:false,languageOptions:[],languageOptionsLoaded:false,listRequestId:0,searchTimer:null,seen:new Map(),sub:null,refreshTimer:null,register:false};
-function t(k){return translations[locale]?.[k]??translations.en[k]??k;}
+let state={category:"all",language:"",search:"",user:null,profile:null,peer:null,allRows:[],totalCount:0,catalogTotal:0,categoryCounts:{},categoryCountsLoaded:false,hasMore:true,loading:false,languageOptions:[],languageOptionsLoaded:false,listRequestId:0,searchTimer:null,seen:new Map(),sub:null,refreshTimer:null,register:false};
+const categoryLabels={ru:"Без категории",en:"Unclassified",es:"Sin categoría",fr:"Sans catégorie",de:"Nicht kategorisiert",pt:"Sem categoria",zh:"未分类",ja:"未分類",ko:"미분류",ar:"غير مصنف",hi:"अवर्गीकृत",tr:"Kategorisiz"};
+function t(k){if(k==="other")return categoryLabels[locale]??"Unclassified";return translations[locale]?.[k]??translations.en[k]??k;}
 function setStatus(id,message,isError=false){const el=$(id);if(!el)return;el.textContent=message;el.classList.toggle("error",isError);}
 function safeErr(e){console.error("Repo Radar:",e);return e?.message||t("error");}
 function localized(){document.documentElement.lang=locale;document.documentElement.dir=locale==="ar"?"rtl":"ltr";
@@ -38,7 +39,8 @@ $("locale").addEventListener("change",e=>{locale=e.target.value;localStorage.set
 $("theme").addEventListener("change",e=>{theme=e.target.value;themeApply();});
 themeApply();
 const number=n=>n>=1000?(n/1000).toFixed(1)+"k":String(n??0);
-function renderCategories(){$("categories").replaceChildren(...categoryKeys.map(key=>{const b=document.createElement("button");b.className="chip"+(state.category===key?" active":"");b.textContent=t(key);b.type="button";b.onclick=()=>{state.category=key;renderCategories();loadRepos(true);};return b;}));}
+function renderCategories(){$("categories").replaceChildren(...categoryKeys.map(key=>{const b=document.createElement("button");b.className="chip"+(state.category===key?" active":"");const count=key==="all"?state.catalogTotal:(state.categoryCounts[key]??0);b.textContent=state.categoryCountsLoaded?`${t(key)} · ${Number(count).toLocaleString(locale)}`:t(key);b.type="button";b.onclick=()=>{state.category=key;renderCategories();loadRepos(true);};return b;}));}
+async function updateCategoryCounts(){if(state.categoryCountsLoaded)return;try{const{data,error}=await sb.rpc("list_repo_category_counts");if(error)throw error;state.categoryCounts=Object.fromEntries((data||[]).map(row=>[row.category,Number(row.total)]));state.catalogTotal=Object.values(state.categoryCounts).reduce((sum,value)=>sum+value,0);state.categoryCountsLoaded=true;renderCategories();}catch(error){console.warn("Repository category counts unavailable:",error.message);state.categoryCountsLoaded=false;}}
 const REPO_PAGE_SIZE=48;
 async function updateLanguageOptions(){if(!state.languageOptionsLoaded){const{data,error}=await sb.rpc("list_repo_languages");if(error){console.warn("Language list unavailable:",error.message);state.languageOptions=[...new Set(state.allRows.map(r=>r.language).filter(Boolean))].sort((a,b)=>a.localeCompare(b));}else{state.languageOptions=(data||[]).map(row=>row.language).filter(Boolean);}state.languageOptionsLoaded=true;}const select=$("language"),current=state.language;const names=state.languageOptions.slice();if(current&&!names.includes(current))names.unshift(current);select.replaceChildren(new Option(t("allLanguages"),""));for(const name of names)select.add(new Option(name,name));select.value=current;}
 function renderRepos(){const rows=state.allRows;const frag=document.createDocumentFragment();if(!rows.length){const empty=document.createElement("div");empty.className="empty";empty.textContent=t("noProjects");frag.append(empty);}
@@ -55,6 +57,8 @@ const more=$("load-more");more.disabled=true;
 if(reset){const loading=document.createElement("p");loading.className="empty";loading.textContent=t("loading");$("grid").replaceChildren(loading);}
 setStatus("status",t("loading"));
 try{
+await updateCategoryCounts();
+if(requestId!==state.listRequestId)return;
 let query=sb.from("repos").select("id,full_name,description,html_url,language,stars,license_spdx,category,pushed_at",{count:"exact"});
 if(state.category!=="all")query=query.eq("category",state.category);
 if(state.language)query=query.eq("language",state.language);
