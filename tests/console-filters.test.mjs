@@ -34,3 +34,16 @@ test("firmware options are scoped to chosen console",()=>{
  assert.ok(!a.firmwareVersions.includes("9.00–12.00"));
  assert.ok(b.firmwareVersions.includes("9.00–12.00"));
 });
+
+test("PS4 firmware families are offered through 14.XX without inventing compatibility",()=>{
+ const options=consoleFacetOptions(projects,"PS4").firmwareVersions;
+ assert.ok(options.includes("14.XX"));
+ assert.ok(options.includes("1.XX"));
+ assert.ok(!consoleFacetOptions(projects,"PS5").firmwareVersions.includes("14.XX"));
+ const a={id:44,name:"PS4 14.04 WebKit",description:"Firmware 14.04",category:"console_webkit",stars:0};
+ assert.deepEqual(filterConsoleProjects([a,...projects],{console:"PS4",firmwareVersion:"14.XX"}).map(x=>x.id),[44]);
+ assert.deepEqual(filterConsoleProjects(projects,{console:"PS4",firmwareVersion:"14.XX"}),[]);
+});
+test("console choices are alphabetical",()=>{
+ assert.deepEqual(consoleFacetOptions(projects).consoles,["PS Vita","PS4","PS5"]);
+});

@@ -29,6 +29,7 @@ jobs:
           node --check lib/catalog.mjs
           node --check lib/console-filters.mjs
           node --check lib/readme-previews.mjs
+          node --check lib/official-info.mjs
           node --check scripts/stamp-build.mjs
           node --check unsupported-browser.js
           node --check scripts/collect.mjs

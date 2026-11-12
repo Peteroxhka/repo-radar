@@ -198,3 +198,45 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
 @media(prefers-contrast:more){
  .repo-card,.chip,.modal,.admin-repo-row{border-width:2px}
 }
+
+/* Official project callout occupies the small gap between hero and catalog. */
+.official-feature{
+ display:flex;align-items:center;justify-content:space-between;gap:20px;
+ margin:-33px 0 41px;padding:16px 21px;
+ background:var(--surface);border:1px solid var(--border);border-radius:17px;
+ box-shadow:0 11px 35px rgba(0,0,0,.08);
+}
+.official-feature-text{display:flex;flex-direction:column;gap:4px;min-width:0}
+.official-feature-kicker{font-size:10px;letter-spacing:1.3px;color:var(--accent);font-weight:800;text-transform:uppercase}
+.official-feature h2{font-size:clamp(16px,2vw,21px)}
+.official-feature p{font-size:12px;color:var(--muted);max-width:660px;line-height:1.5}
+.official-feature-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:9px;flex-shrink:0}
+.official-feature-actions .button{white-space:nowrap}
+.admin-integration{
+ display:flex;align-items:center;justify-content:space-between;gap:15px;
+ background:var(--surface);border:1px solid var(--border);border-radius:17px;
+ margin:0 0 22px;padding:19px;
+}
+.admin-integration h2{font-size:20px;margin-bottom:5px}
+.admin-integration p{max-width:670px;line-height:1.55}
+.admin-repo-github{
+ color:var(--accent);font-size:12px;font-weight:800;
+ border-bottom:1px solid currentColor;text-decoration:none;
+ white-space:nowrap;padding:4px 2px;
+}
+.admin-repo-github:hover{text-decoration:underline}
+.footer-guide{font-size:11px;color:var(--accent);text-decoration:none}
+.footer-guide:hover{text-decoration:underline}
+.dialog-divider{width:100%;border:0;border-top:1px solid var(--border);margin:7px 0}
+@media(max-width:960px){
+ .official-feature{flex-direction:column;align-items:stretch}
+ .official-feature-actions{justify-content:flex-start;flex-shrink:1}
+}
+@media(max-width:590px){
+ .official-feature{margin:-17px 0 32px;padding:15px;gap:13px}
+ .official-feature-actions{flex-direction:column;align-items:stretch;width:100%}
+ .official-feature-actions .button{width:100%;white-space:normal;text-align:center}
+ .admin-integration{flex-direction:column;align-items:stretch;padding:15px}
+ .admin-integration .button{width:100%}
+ .admin-repo-github{align-self:flex-start}
+}

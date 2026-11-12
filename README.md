@@ -63,3 +63,11 @@ Apply `supabase/migrations/20261114_storage_hardening.sql` after the chat reliab
 It changes Storage RLS and removes the unrestricted `application/octet-stream` upload type without removing existing user files. Uploads still support documents, photos, audio, video and archives with known MIME types. Receivers can only read files referenced by messages sent to them. Existing files owned by senders remain accessible to their senders. This is not malware scanning; public deployments need scanning, rate limits and abuse reporting.
 
 The chat UI now uses exactly **one PostgREST OR filter per message query**, ensuring the sender/recipient pair is never lost when cursor pagination is applied. OAuth errors returned as query/hash parameters appear in the login dialog instead of an unexplained home page. New tests cover these cases. GitHub OAuth still requires the provider and signup permissions to be enabled in Supabase Auth settings.
+
+## Build a similar site with Supabase
+
+Follow the step-by-step **[Supabase + GitHub Pages guide](docs/BUILD_WITH_SUPABASE.md)** (Russian with an English quick start). It explains RLS, OAuth, server-side import, deployment, and how to secure administrator functions.
+
+The **Connect Supabase** button inside the owner-only admin panel checks the existing connection or the public API of another Supabase project. It does **not** connect an external project for administration or store its publishable key. Never input secret/service-role keys in the browser.
+
+The official Repo Radar banner is translated into the 12 languages supported by the site. Console WebKit filters include alphabetically sorted consoles and PS4 firmware families up to 14.XX; firmware filters represent repository claims, **not verified compatibility**. Searching a new term resets old category/language constraints so an earlier filter cannot silently hide results.

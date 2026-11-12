@@ -2,6 +2,7 @@ import {normalizeSearch, mergeMessages, isCurrentChat, dmConversationFilter, att
 import {createClient} from "https://esm.sh/@supabase/supabase-js@2.57.0";
 import {trustedGitHubPagesSite} from "./lib/catalog.mjs";
 import {readmeScreenshots} from "./lib/readme-previews.mjs";
+import {officialText} from "./lib/official-info.mjs";
 import {consoleMetadata,filterConsoleProjects,sortConsoleProjects,consoleFacetOptions} from "./lib/console-filters.mjs";
 import {SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, DATABASE_SCHEMA} from "./config.js";
 const sb=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{db:{schema:DATABASE_SCHEMA},auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
@@ -77,6 +78,30 @@ Object.assign(translations.ru,{
  screenshotsNone:"В README нет скриншотов.",screenshotsUnavailable:"Не удалось загрузить скриншоты.",
  refreshLatest:"Загрузить новую версию"
 });
+
+Object.assign(translations.en,{
+ adminSupabaseTitle:"Supabase connection",adminSupabaseHint:"This site's database is linked. Check it or test another project's public API. Never enter a service_role key.",
+ adminConnectSupabase:"Connect Supabase",supabaseCurrentIntro:"Repo Radar already uses Supabase. Verify the current connection below.",
+ supabaseCheckCurrent:"Check current connection",supabaseExternalIntro:"Test another project's public API. This does not replace Repo Radar's database or grant administrative access.",
+ supabaseProjectUrl:"Supabase project URL",supabasePublicKey:"Publishable key (sb_publishable_…) only",
+ supabaseTestPublic:"Test public connection",supabaseNeverSecret:"Never enter a service_role key, secret key, or database password. External connection details are not stored.",
+ supabaseCurrentOK:"Current Supabase connection is working and admin access is verified.",
+ supabaseExternalOK:"Public Supabase API responds. This is a connectivity check only; no project has been linked for administration.",
+ supabaseInvalid:"Enter a valid https://<project>.supabase.co URL and a publishable key.",
+ buildGuideLink:"Build a website with Supabase"
+});
+Object.assign(translations.ru,{
+ adminSupabaseTitle:"Подключение Supabase",adminSupabaseHint:"База сайта уже подключена. Проверь её или протестируй публичный API другого проекта. Никогда не вводи service_role ключ.",
+ adminConnectSupabase:"Привязать Supabase",supabaseCurrentIntro:"Repo Radar уже использует Supabase. Проверь действующее подключение.",
+ supabaseCheckCurrent:"Проверить текущее подключение",supabaseExternalIntro:"Можно проверить публичный API другого проекта. Это не заменяет базу Repo Radar и не выдаёт права администратора.",
+ supabaseProjectUrl:"URL проекта Supabase",supabasePublicKey:"Только publishable-ключ (sb_publishable_…)",
+ supabaseTestPublic:"Проверить публичное подключение",supabaseNeverSecret:"Никогда не вводи service_role, secret key или пароль базы. Данные внешнего подключения не сохраняются.",
+ supabaseCurrentOK:"Текущий Supabase доступен, права администратора подтверждены.",
+ supabaseExternalOK:"Публичный API Supabase отвечает. Это только проверка связи, а не админское подключение.",
+ supabaseInvalid:"Укажи адрес https://<проект>.supabase.co и publishable-ключ.",
+ buildGuideLink:"Как создать свой сайт с Supabase"
+});
+
 const categoryKeys=["all","programming","tools","ai","data","web","learning","games","console_webkit","other"];
 const localeNames={ru:"Русский",en:"English",es:"Español",fr:"Français",de:"Deutsch",pt:"Português",zh:"中文",ja:"日本語",ko:"한국어",ar:"العربية",hi:"हिन्दी",tr:"Türkçe"};
 const allowedExt=new Set(["jpg","jpeg","png","webp","gif","bmp","heic","mp4","webm","mov","m4v","mp3","ogg","wav","m4a","aac","flac","pdf","txt","md","csv","json","doc","docx","xls","xlsx","ppt","pptx","odt","ods","odp","zip","7z","rar"]);
@@ -92,7 +117,11 @@ Object.assign(translations.en,{sort:"Sort",sortPopular:"Most starred ★",sortLe
 const categoryLabels={ru:"Без категории",en:"Unclassified",es:"Sin categoría",fr:"Sans catégorie",de:"Nicht kategorisiert",pt:"Sem categoria",zh:"未分类",ja:"未分類",ko:"미분류",ar:"غير مصنف",hi:"अवर्गीकृत",tr:"Kategorisiz"};
 Object.assign(translations.ru,{olderMessages:"Предыдущие сообщения",ps4Title:"Мир PlayStation 4",ps4Intro:"Инструменты разработки, эмуляция и проекты сообщества PS4.",ps4Source:"Открыть репозиторий",ps4Search:"Найти PS4 в каталоге",ps4Reference:"Проект из твоей подборки",ps4Sdk:"Открытый модульный SDK для разработки под PS4.",ps4Toolchain:"Инструменты и примеры для создания домашних приложений PS4.",ps4Emulator:"Эмулятор PlayStation 4 для компьютера.",cleanupFailed:"Сообщение не отправлено. Не удалось удалить вложение из хранилища.",messageTooLong:"Сообщение не должно превышать 4000 символов."});
 Object.assign(translations.en,{olderMessages:"Older messages",ps4Title:"The PlayStation 4 world",ps4Intro:"Development tools, emulation and PS4 community projects.",ps4Source:"Open repository",ps4Search:"Find PS4 in the catalog",ps4Reference:"Project from your collection",ps4Sdk:"An open modular SDK for PS4 development.",ps4Toolchain:"Tools and examples for building PS4 homebrew applications.",ps4Emulator:"A PlayStation 4 emulator for desktop computers.",cleanupFailed:"Message not sent. The attachment could not be removed from storage.",messageTooLong:"Messages must not exceed 4000 characters."});
-function t(k){if(k==="other")return categoryLabels[locale]??"Unclassified";return translations[locale]?.[k]??translations.en[k]??k;}
+function t(k){if(k==="other")return categoryLabels[locale]??"Unclassified";return translations[locale]?.[k]??officialText(locale,k)??translations.en[k]??k;}
+function descriptionFor(repo){
+ if(repo.full_name?.toLowerCase()==="peteroxhka/repo-radar")return officialText(locale,"repoRadarDescription");
+ return String(repo.description||"");
+}
 function setStatus(id,message,isError=false){const el=$(id);if(!el)return;el.textContent=message;el.classList.toggle("error",isError);}
 function safeErr(e){console.error("Repo Radar:",e);return e?.message||t("error");}
 function localized(){document.documentElement.lang=locale;document.documentElement.dir=locale==="ar"?"rtl":"ltr";
@@ -155,7 +184,7 @@ async function updateLanguageOptions(){if(!state.languageOptionsLoaded){const{da
 function renderRepos(){const rows=state.allRows;const frag=document.createDocumentFragment();if(!rows.length){const empty=document.createElement("div");empty.className="empty";empty.textContent=t("noProjects");frag.append(empty);}
 for(const r of rows){const card=document.createElement("article");card.className="repo-card";const title=document.createElement("a");title.className="repo-title";title.textContent=r.name;try{const url=new URL(r.html_url);if(url.protocol==="https:"&&url.hostname==="github.com"){title.href=url.href;title.target="_blank";title.rel="noopener noreferrer";}}catch{}const descWrap=document.createElement("div");descWrap.className="repo-description-wrap";
 const desc=document.createElement("p");desc.className="repo-desc";
-const fullDescription=String(r.description||"");
+const fullDescription=descriptionFor(r);
 const characters=Array.from(fullDescription);
 const hasLongDescription=characters.length>350;
 const preview=hasLongDescription?characters.slice(0,300).join("").trimEnd()+"…":fullDescription||t("noDescription");
@@ -212,7 +241,7 @@ async function openProjectDetails(repo){
  titleLink.textContent=repo.name||fullname;
  if(sourceUrl){titleLink.href=sourceUrl;titleLink.target="_blank";titleLink.rel="noopener noreferrer";}
  title.replaceChildren(titleLink);
- const desc=String(repo.description||t("noDescription")).trim();
+ const desc=String(descriptionFor(repo)||t("noDescription")).trim();
  $("repo-detail-description").textContent=Array.from(desc).slice(0,950).join("")+(Array.from(desc).length>950?"…":"");
  const info=[repo.language,repo.category,`★ ${number(repo.stars)}`].filter(Boolean);
  const detailTags=info.map(value=>{const tag=document.createElement("span");tag.className="repo-tag";tag.textContent=value;return tag;});
@@ -335,7 +364,19 @@ if(requestId===state.listRequestId){state.loading=false;more.disabled=false;}
 $("language").onchange=e=>{state.language=e.target.value;loadRepos(true);};
 $("repo-sort").onchange=e=>{state.sort=e.target.value;loadRepos(true);};
 $("search-descriptions").onchange=e=>{state.includeDescription=e.target.checked;loadRepos(true);};
-$("repo-search").oninput=e=>{state.search=e.target.value.trim();state.listRequestId+=1;state.loading=true;clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>loadRepos(true),250);};
+$("repo-search").oninput=e=>{
+ state.search=e.target.value.trim();
+ // A new search should search the entire catalog, rather than silently keeping
+ // a console/category/language filter selected during a previous search.
+ if(state.search){
+  state.category="all";state.language="";
+  state.consoleFilters={console:"",version:"",firmwareVersion:"",firmwareType:""};
+  $("language").value="";
+  renderCategories();
+ }
+ state.listRequestId+=1;state.loading=true;clearTimeout(state.searchTimer);
+ state.searchTimer=setTimeout(()=>loadRepos(true),250);
+};
 $("load-more").onclick=()=>loadRepos(false);
 if("IntersectionObserver" in window){
 const catalogObserver=new IntersectionObserver(entries=>{
@@ -420,6 +461,15 @@ function renderAdminRepoResults(rows){
   const name=document.createElement("strong");name.textContent=r.full_name;
   const meta=document.createElement("span");meta.textContent=`${r.category} · ★ ${number(r.stars)} · ${t(r.admin_hidden?"adminHidden":"adminVisible")}`;
   info.append(name,meta);
+  const github=document.createElement("a");
+  const githubPath=String(r.full_name||"").split("/");
+  const validPath=githubPath.length===2&&githubPath.every(part=>/^[a-zA-Z0-9_.-]+$/.test(part));
+  github.textContent="GitHub";
+  github.className="admin-repo-github";
+  if(validPath){
+   github.href="https://github.com/"+githubPath.map(encodeURIComponent).join("/");
+   github.target="_blank";github.rel="noopener noreferrer";
+  }else{github.removeAttribute("href");github.classList.add("hidden");}
   const action=document.createElement("button");action.type="button";
   action.className="button "+(r.admin_hidden?"button-primary":"button-outline");
   action.textContent=t(r.admin_hidden?"adminRestore":"adminHide");
@@ -431,11 +481,60 @@ function renderAdminRepoResults(rows){
    setStatus("admin-status",t("adminSaved"));
    await loadAdminDashboard();
   };
-  wrapper.append(info,action);return wrapper;
+  wrapper.append(info,github,action);return wrapper;
  });
  if(!items.length){const empty=document.createElement("p");empty.className="hint";empty.textContent=t("noProjects");items.push(empty);}
  $("admin-project-list").replaceChildren(...items);
 }
+
+// This is a public connectivity test for admin review, NOT OAuth or a privileged
+// integration. The entered publishable key is never sent to our backend, stored,
+// added to URLs, or copied into the active application configuration.
+$("admin-supabase-connect").onclick=()=>{
+ if(!state.adminAuthorized)return;
+ $("supabase-project-url").value="";
+ $("supabase-public-key").value="";
+ setStatus("supabase-current-status","");
+ setStatus("supabase-test-status","");
+ openDialog("supabase-dialog");
+};
+$("supabase-check-current").onclick=async()=>{
+ if(!state.adminAuthorized)return;
+ const button=$("supabase-check-current");button.disabled=true;
+ setStatus("supabase-current-status",t("busy"));
+ try{
+  const {data,error}=await sb.rpc("admin_is_authorized");
+  if(error||data!==true)throw error||Error("Admin access required");
+  setStatus("supabase-current-status",t("supabaseCurrentOK"));
+ }catch(e){setStatus("supabase-current-status",safeErr(e),true);}
+ finally{button.disabled=false;}
+};
+$("supabase-public-test-form").onsubmit=async event=>{
+ event.preventDefault();
+ if(!state.adminAuthorized)return;
+ const input=$("supabase-project-url").value.trim();
+ const key=$("supabase-public-key").value.trim();
+ let url;
+ try{url=new URL(input);}catch{setStatus("supabase-test-status",t("supabaseInvalid"),true);return;}
+ // Only *.supabase.co HTTPS project URLs. No custom origins, no private hosts.
+ if(url.protocol!=="https:"||url.username||url.password||url.port||
+  !/^[a-z0-9-]+\.supabase\.co$/.test(url.hostname)||
+  url.pathname!=="/"||url.search||url.hash||
+  !/^sb_publishable_[A-Za-z0-9_-]{8,}$/.test(key)){
+  setStatus("supabase-test-status",t("supabaseInvalid"),true);return;
+ }
+ const button=$("supabase-test-external");button.disabled=true;
+ setStatus("supabase-test-status",t("busy"));
+ try{
+  const res=await fetch(url.origin+"/auth/v1/settings",{
+   method:"GET",headers:{apikey:key,Accept:"application/json"},cache:"no-store"
+  });
+  if(!res.ok)throw Error("Supabase public API HTTP "+res.status);
+  setStatus("supabase-test-status",t("supabaseExternalOK"));
+ }catch(e){setStatus("supabase-test-status",safeErr(e),true);}
+ finally{button.disabled=false;$("supabase-public-key").value="";}
+};
+
 $("admin-search-form").onsubmit=async e=>{
  e.preventDefault();if(!state.adminAuthorized)return;
  setStatus("admin-status",t("loading"));

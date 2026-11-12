@@ -54,6 +54,17 @@
         <div class="hero-actions"><a href="#repos" class="button button-primary" data-i18n="explore">Исследовать проекты</a><span class="hero-stat"><strong id="repo-count">—</strong> <span data-i18n="projects">проектов</span></span></div>
         <div class="hero-shine" aria-hidden="true"></div>
       </section>
+      <aside class="official-feature" aria-label="Official project repository">
+        <div class="official-feature-text">
+          <span class="official-feature-kicker" data-i18n="featuredRepoEyebrow">Official source of Repo Radar</span>
+          <h2 data-i18n="featuredRepoTitle">Repo Radar on GitHub</h2>
+          <p data-i18n="repoRadarDescription">Repo Radar is an open-source GitHub project discovery site with search, categories, filters, project previews, and a community.</p>
+        </div>
+        <div class="official-feature-actions">
+          <a class="button button-outline" href="https://github.com/Peteroxhka/repo-radar" target="_blank" rel="noopener noreferrer" data-i18n="featuredRepoGithub">View source code</a>
+          <a class="button button-primary" href="https://peteroxhka.github.io/repo-radar/" target="_blank" rel="noopener noreferrer" data-i18n="featuredRepoWebsite">Open website</a>
+        </div>
+      </aside>
 
       <section id="repos" class="feed-section">
         <div class="section-heading"><div><p class="section-kicker" data-i18n="discover">Обзор</p><h2 data-i18n="trending">Проекты, достойные внимания</h2></div></div>
@@ -127,6 +138,13 @@
         </div>
       </div>
       <div id="admin-stats" class="admin-stats" aria-live="polite"></div>
+      <div class="admin-integration">
+        <div>
+          <h2 data-i18n="adminSupabaseTitle">Supabase connection</h2>
+          <p class="hint" data-i18n="adminSupabaseHint">The site's database is already linked. Check the connection or test another project's public API; never enter a service_role key.</p>
+        </div>
+        <button id="admin-supabase-connect" type="button" class="button button-outline" data-i18n="adminConnectSupabase">Connect Supabase</button>
+      </div>
       <div class="admin-browser">
         <h2 data-i18n="adminCatalog">Manage repositories</h2>
         <p class="hint" data-i18n="adminCatalogHint">Search project names and hide inappropriate entries. Changes can be reversed.</p>
@@ -144,10 +162,33 @@
         <div class="footer-utilities">
           <button id="reload-latest" class="footer-refresh" type="button" data-i18n="refreshLatest">Load latest version</button>
           <span class="build-info">Build <code>__BUILD_SHA__</code></span>
+          <a class="footer-guide" href="https://github.com/Peteroxhka/repo-radar/blob/main/docs/BUILD_WITH_SUPABASE.md" target="_blank" rel="noopener noreferrer" data-i18n="buildGuideLink">Build a site with Supabase</a>
         </div>
       </footer>
   </main>
 
+  <dialog id="supabase-dialog" class="modal" aria-labelledby="supabase-dialog-title">
+    <form id="supabase-public-test-form" class="modal-inner">
+      <button class="close" type="button" data-close="supabase-dialog" aria-label="Close">×</button>
+      <p class="section-kicker">SUPABASE</p>
+      <h2 id="supabase-dialog-title" data-i18n="adminConnectSupabase">Connect Supabase</h2>
+      <p class="hint" data-i18n="supabaseCurrentIntro">Repo Radar already uses a Supabase project. The button below verifies that the existing connection works.</p>
+      <button type="button" id="supabase-check-current" class="button button-primary full" data-i18n="supabaseCheckCurrent">Check current connection</button>
+      <p id="supabase-current-status" class="hint" role="status"></p>
+      <hr class="dialog-divider">
+      <p class="hint" data-i18n="supabaseExternalIntro">Test the public API of another Supabase project. This is only a connectivity check; it does not grant management access or replace this site's database.</p>
+      <label class="field"><span data-i18n="supabaseProjectUrl">Project URL</span>
+        <input id="supabase-project-url" type="url" placeholder="https://your-project.supabase.co" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="field"><span data-i18n="supabasePublicKey">Publishable (anon) key only</span>
+        <input id="supabase-public-key" type="password" placeholder="sb_publishable_… or anon key" autocomplete="off" spellcheck="false">
+      </label>
+      <button type="submit" id="supabase-test-external" class="button button-outline full" data-i18n="supabaseTestPublic">Test public connection</button>
+      <p class="hint" id="supabase-test-status" role="status"></p>
+      <p class="hint" data-i18n="supabaseNeverSecret">Never paste a service_role key or database password here. External connections are not stored.</p>
+      <a href="https://github.com/Peteroxhka/repo-radar/blob/main/docs/BUILD_WITH_SUPABASE.md" target="_blank" rel="noopener noreferrer" data-i18n="buildGuideLink">Build a site with Supabase</a>
+    </form>
+  </dialog>
   <dialog id="repo-dialog" class="modal repo-modal" aria-labelledby="repo-detail-title">
     <div class="modal-inner repo-detail-inner">
       <button class="close" type="button" data-close="repo-dialog" aria-label="Close">×</button>
