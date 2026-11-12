@@ -23,7 +23,7 @@ const blockedMime=/x-msdownload|x-executable|x-sh|x-bat|x-dosexec|javascript|tex
 let locale=localStorage.getItem("radar-locale")||((navigator.language||"ru").slice(0,2));
 if(!translations[locale])locale="en";
 let theme=localStorage.getItem("radar-theme")||"dark";if(!["dark","light","cosmic"].includes(theme))theme="dark";
-let state={category:"all",language:"",search:"",user:null,profile:null,peer:null,allRows:[],totalCount:0,languageOptions:[],languageOptionsLoaded:false,listRequestId:0,searchTimer:null,seen:new Map(),sub:null,refreshTimer:null,register:false};
+let state={category:"all",language:"",search:"",user:null,profile:null,peer:null,allRows:[],totalCount:0,hasMore:true,loading:false,languageOptions:[],languageOptionsLoaded:false,listRequestId:0,searchTimer:null,seen:new Map(),sub:null,refreshTimer:null,register:false};
 function t(k){return translations[locale]?.[k]??translations.en[k]??k;}
 function setStatus(id,message,isError=false){const el=$(id);if(!el)return;el.textContent=message;el.classList.toggle("error",isError);}
 function safeErr(e){console.error("Repo Radar:",e);return e?.message||t("error");}
@@ -45,13 +45,55 @@ function renderRepos(){const rows=state.allRows;const frag=document.createDocume
 for(const r of rows){const card=document.createElement("article");card.className="repo-card";const title=document.createElement("a");title.className="repo-title";title.textContent=r.full_name;try{const url=new URL(r.html_url);if(url.protocol==="https:"&&url.hostname==="github.com"){title.href=url.href;title.target="_blank";title.rel="noopener noreferrer";}}catch{}const desc=document.createElement("p");desc.className="repo-desc";desc.textContent=r.description||t("noDescription");const meta=document.createElement("div");meta.className="repo-meta";
 const things=[[r.language,"repo-tag"],["★ "+number(r.stars)],r.license_spdx?[r.license_spdx]:null,r.pushed_at?[new Date(r.pushed_at).toLocaleDateString(locale)]:null].filter(Boolean);
 for(const [str,cls] of things){const item=document.createElement("span");if(cls)item.className=cls;item.textContent=str;meta.append(item);}card.append(title,desc,meta);frag.append(card);} $("grid").replaceChildren(frag);}
-async function loadRepos(reset=true){const requestId=++state.listRequestId;if(reset){state.allRows=[];$("grid").replaceChildren();}const offset=reset?0:state.allRows.length;const more=$("load-more");more.disabled=true;if(reset){const loading=document.createElement("p");loading.className="empty";loading.textContent=t("loading");$("grid").replaceChildren(loading);}setStatus("status",t("loading"));
-try{let query=sb.from("repos").select("id,full_name,description,html_url,language,stars,license_spdx,category,pushed_at",{count:"exact"});if(state.category!=="all")query=query.eq("category",state.category);if(state.language)query=query.eq("language",state.language);const term=state.search.replace(/[^\p{L}\p{N}\s._/-]/gu," ").replace(/\s+/g," ").trim().slice(0,80);if(term)query=query.or(`full_name.ilike.%${term}%,description.ilike.%${term}%`);query=query.order("stars",{ascending:false}).order("id",{ascending:false}).range(offset,offset+REPO_PAGE_SIZE-1);const{data,error,count}=await query;if(requestId!==state.listRequestId)return;if(error)throw error;state.allRows=reset?(data||[]):state.allRows.concat(data||[]);state.totalCount=Number(count??state.allRows.length);$("repo-count").textContent=state.totalCount.toLocaleString(locale);await updateLanguageOptions();if(requestId!==state.listRequestId)return;renderRepos();more.hidden=state.allRows.length>=state.totalCount||(data||[]).length===0;setStatus("status",`${state.allRows.length.toLocaleString(locale)} / ${state.totalCount.toLocaleString(locale)}`);}
-catch(e){if(requestId!==state.listRequestId)return;setStatus("status",safeErr(e),true);more.hidden=reset;if(reset)$("grid").replaceChildren();}
-finally{if(requestId===state.listRequestId)more.disabled=false;}}
+async function loadRepos(reset=true){
+if(!reset&&(state.loading||!state.hasMore))return;
+const requestId=++state.listRequestId;
+state.loading=true;
+if(reset){state.allRows=[];state.totalCount=0;state.hasMore=true;$("grid").replaceChildren();}
+const offset=reset?0:state.allRows.length;
+const more=$("load-more");more.disabled=true;
+if(reset){const loading=document.createElement("p");loading.className="empty";loading.textContent=t("loading");$("grid").replaceChildren(loading);}
+setStatus("status",t("loading"));
+try{
+let query=sb.from("repos").select("id,full_name,description,html_url,language,stars,license_spdx,category,pushed_at",{count:"exact"});
+if(state.category!=="all")query=query.eq("category",state.category);
+if(state.language)query=query.eq("language",state.language);
+const term=state.search.replace(/[^\\p{L}\\p{N}\\s._/-]/gu," ").replace(/\\s+/g," ").trim().slice(0,80);
+if(term)query=query.or(`full_name.ilike.%${term}%,description.ilike.%${term}%`);
+query=query.order("stars",{ascending:false}).order("id",{ascending:false}).range(offset,offset+REPO_PAGE_SIZE-1);
+const{data,error,count}=await query;
+if(requestId!==state.listRequestId)return;
+if(error)throw error;
+const page=data||[];
+state.allRows=reset?page:state.allRows.concat(page);
+state.totalCount=Number(count??state.allRows.length);
+state.hasMore=page.length===REPO_PAGE_SIZE&&state.allRows.length<state.totalCount;
+$("repo-count").textContent=state.totalCount.toLocaleString(locale);
+await updateLanguageOptions();
+if(requestId!==state.listRequestId)return;
+renderRepos();
+more.hidden=!state.hasMore;
+setStatus("status",`${state.allRows.length.toLocaleString(locale)} / ${state.totalCount.toLocaleString(locale)}`);
+}
+catch(e){
+if(requestId!==state.listRequestId)return;
+setStatus("status",safeErr(e),true);
+more.hidden=reset||!state.hasMore;
+if(reset)$("grid").replaceChildren();
+}
+finally{
+if(requestId===state.listRequestId){state.loading=false;more.disabled=false;}
+}}
+
 $("language").onchange=e=>{state.language=e.target.value;loadRepos(true);};
 $("repo-search").oninput=e=>{state.search=e.target.value.trim();clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>loadRepos(true),250);};
 $("load-more").onclick=()=>loadRepos(false);
+if("IntersectionObserver" in window){
+const catalogObserver=new IntersectionObserver(entries=>{
+if(entries.some(entry=>entry.isIntersecting)&&state.hasMore&&!state.loading)loadRepos(false);
+},{root:null,rootMargin:"900px 0px 900px 0px",threshold:0});
+catalogObserver.observe($("load-more-sentinel"));
+}
 function showTab(tab){const messages=tab==="messages";$("view-discover").classList.toggle("hidden",messages);$("view-messages").classList.toggle("hidden",!messages);
 $("tab-messages").classList.toggle("active",messages);$("tab-discover").classList.toggle("active",!messages);if(messages&&state.user)loadContacts();}
 $("tab-discover").onclick=()=>showTab("discover");$("tab-messages").onclick=()=>showTab("messages");
