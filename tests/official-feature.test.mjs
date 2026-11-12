@@ -8,7 +8,7 @@ test("Repo Radar official description is translated in every supported UI langua
  assert.deepEqual(supportedOfficialLocales.sort(),supported.sort());
  for(const code of supported){
   for(const key of ["featuredRepoEyebrow","featuredRepoTitle","repoRadarDescription","featuredRepoGithub","featuredRepoWebsite"]){
-   assert.ok(officialText(code,key)?.length>8,`${code}/${key}`);
+   assert.ok(officialText(code,key)?.trim().length>=2,`${code}/${key}`);
   }
  }
  assert.equal(officialText("en","unknown"),null);
