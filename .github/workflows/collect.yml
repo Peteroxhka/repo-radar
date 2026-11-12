@@ -6,7 +6,10 @@ on:
     paths:
       - "scripts/collect.mjs"
       - "lib/discovery-plan.mjs"
+      - "lib/repo-quality.mjs"
       - "tests/discovery-plan.test.mjs"
+      - "tests/repo-quality.test.mjs"
+      - "tests/collector-guard.test.mjs"
       - ".github/workflows/collect.yml"
       - "supabase/migrations/**"
   schedule:
@@ -33,7 +36,8 @@ jobs:
         run: |
           node --check scripts/collect.mjs
           node --check lib/discovery-plan.mjs
-          node --test tests/discovery-plan.test.mjs
+          node --check lib/repo-quality.mjs
+          node --test tests/discovery-plan.test.mjs tests/repo-quality.test.mjs tests/collector-guard.test.mjs
       - name: Collect public GitHub catalog
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

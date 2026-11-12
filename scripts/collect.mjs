@@ -1,6 +1,7 @@
 // Curated discovery from GitHub search. Never bulk-import incomplete /repositories entries.
 import {isConsoleWebKit, trustedGitHubPagesSite} from "../lib/catalog.mjs";
 import {buildDiscoveryPlan,discoverySlot} from "../lib/discovery-plan.mjs";
+import {assessProject} from "../lib/repo-quality.mjs";
 const API="https://api.github.com";
 const BASE=process.env.SUPABASE_URL;
 const KEY=process.env.SUPABASE_SERVICE_KEY;
@@ -32,6 +33,43 @@ const QUERIES=[
  ["data","postgres in:name"]
 ];
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const REPO_API=BASE.replace(/\/$/,"")+"/rest/v1/repos";
+const AUTH_HEADERS={apikey:KEY,Authorization:`Bearer ${KEY}`,"Accept-Profile":"repo_radar"};
+const knownIds=new Set();
+const qualityStats=new Map();
+function skip(reason){qualityStats.set(reason,(qualityStats.get(reason)||0)+1);}
+async function knownInDatabase(ids){
+ const list=[...new Set(ids.filter(id=>Number.isSafeInteger(id)&&id>0))];
+ const found=new Set();
+ for(let offset=0;offset<list.length;offset+=100){
+  const part=list.slice(offset,offset+100),url=new URL(REPO_API);
+  url.searchParams.set("select","id");
+  url.searchParams.set("id","in.("+part.join(",")+")");
+  url.searchParams.set("limit","100");
+  let done=false,lastError;
+  for(let attempt=0;attempt<3;attempt++){
+   try{
+    const res=await fetch(url.href,{headers:AUTH_HEADERS,signal:AbortSignal.timeout(30000)});
+    if(!res.ok){
+     const message=(await res.text()).slice(0,400);
+     lastError=new Error(`Supabase duplicate lookup ${res.status}: ${message}`);
+     if(![408,429,500,502,503,504].includes(res.status))throw lastError;
+    }else{
+     const rows=await res.json();
+     if(!Array.isArray(rows))throw Error("Unexpected Supabase lookup response");
+     for(const row of rows)if(Number.isSafeInteger(row.id))found.add(row.id);
+     done=true;break;
+    }
+   }catch(error){
+    lastError=error;
+    if(/^Supabase duplicate lookup 4(?!29)/.test(String(error.message)))throw error;
+   }
+   if(attempt<2)await sleep(900*(attempt+1));
+  }
+  if(!done)throw lastError||Error("Supabase duplicate lookup failed");
+ }
+ return found;
+}
 function classify(repo,fallback){
  if(isConsoleWebKit(repo))return "console_webkit";
  const topics=(repo.topics||[]).join(" ").toLowerCase();
@@ -82,7 +120,7 @@ async function upsertBatch(part){
    const res=await fetch(`${BASE}/rest/v1/repos?on_conflict=id`,{
     method:"POST",headers:{apikey:KEY,Authorization:`Bearer ${KEY}`,
      "Content-Type":"application/json","Content-Profile":"repo_radar",
-     Prefer:"resolution=merge-duplicates,return=minimal"},
+     Prefer:"resolution=ignore-duplicates,return=minimal"},
     body:JSON.stringify(part),signal:AbortSignal.timeout(60000)});
    if(res.ok)return;
    const detail=(await res.text()).slice(0,1200);
@@ -131,8 +169,11 @@ async function syncFeaturedOriginals(){
   entry.description=repo.description||item.fallbackDescription;
   toSave.push(entry);
  }
- await upsert(toSave);
- console.log(`Saved ${toSave.length} featured original repositories`);
+ const existing=await knownInDatabase(toSave.map(entry=>entry.id));
+ const missing=toSave.filter(entry=>!existing.has(entry.id));
+ await upsert(missing);
+ for(const entry of toSave)knownIds.add(entry.id);
+ console.log(`Featured originals: ${missing.length} new, ${existing.size} existing (not overwritten)`);
 }
 await syncFeaturedOriginals();
 
@@ -140,46 +181,56 @@ const recent=discoverySlot();
 const sort=recent%3===0?"updated":"stars";
 const jobs=buildDiscoveryPlan(QUERIES,recent);
 console.log(`Discovery plan: ${jobs.length} searches, ${jobs.filter(x=>x.track==="rotating").length} rotating topics, ${jobs.filter(x=>x.track==="deep").length} deeper pages, sorting by ${sort}`);
-const collected=new Map();
-const persisted=new Set();
-let successful=0,failed=0;
+let successful=0,failed=0,skippedInRun=0,skippedExisting=0,inserted=0;
 for(const {category,search,page,track} of jobs){
  const q=`${search} fork:false archived:false stars:>=2`;
  const url=`${API}/search/repositories?q=${encodeURIComponent(q)}&sort=${sort}&order=desc&per_page=100&page=${page}`;
+ let results;
  try{
-  const results=await getJson(url);
+  results=await getJson(url);
   successful++;
-  const fresh=[];
-  for(const repo of results.items||[]){
-   if(!repo.id||!repo.name||!repo.html_url||repo.fork||repo.archived||repo.private)continue;
-   // Preserve rare console-WebKit projects even when descriptions are sparse,
-   // but don't fill other categories with empty low-star placeholders.
-   if((repo.description||"").trim().length<8&&repo.stargazers_count<8&&category!=="console_webkit")continue;
-   const entry=row(repo,category);
-   // Only actual console WebKit projects may enter this focused category.
-   if(category==="console_webkit"&&entry.category!=="console_webkit")continue;
-   if(entry.category==="console_webkit"){
-    const direct=trustedGitHubPagesSite(repo.homepage);
-    if(direct)entry.homepage=direct;
-    else if(repo.has_pages){
-     try{
-      const pages=await getJson(`${API}/repos/${repo.full_name}/pages`);
-      entry.homepage=trustedGitHubPagesSite(pages.html_url);
-     }catch(error){console.warn(`No public GitHub Pages metadata for ${repo.full_name}: ${error.message}`);}
-    }
-   }
-   collected.set(repo.id,entry);
-   if(!persisted.has(repo.id))fresh.push(entry);
-  }
-  await upsert(fresh);
-  for(const item of fresh)persisted.add(item.id);
-  console.log(`[${track}] ${search} page ${page}: ${results.items?.length||0} matches, ${fresh.length} eligible saved`);
  }catch(error){
-  failed++;
-  console.error(`Search failed (${search} page ${page}): ${error.message}`);
+  failed++;console.error(`Search failed (${search} page ${page}): ${error.message}`);
+  await sleep(2400);continue;
  }
+ const candidates=[];
+ for(const repo of results.items||[]){
+  if(!repo||!Number.isSafeInteger(repo.id)||repo.id<=0)continue;
+  if(knownIds.has(repo.id)){skippedInRun++;continue;}
+  const verdict=assessProject(repo);
+  if(!verdict.eligible){skip(verdict.reason);continue;}
+  const actualCategory=classify(repo,category);
+  if(category==="console_webkit"&&actualCategory!=="console_webkit"){skip("wrong-category");continue;}
+  candidates.push({repo,actualCategory});
+ }
+ // Query indexed Supabase primary keys before every insert. A failed duplicate
+ // check must stop the job, never fall back to blindly inserting/updating.
+ const existing=await knownInDatabase(candidates.map(x=>x.repo.id));
+ const fresh=[];
+ for(const {repo,actualCategory} of candidates){
+  if(existing.has(repo.id)||knownIds.has(repo.id)){
+   skippedExisting++;knownIds.add(repo.id);continue;
+  }
+  const item=row(repo,actualCategory);
+  if(item.category==="console_webkit"){
+   const direct=trustedGitHubPagesSite(repo.homepage);
+   if(direct)item.homepage=direct;
+   else if(repo.has_pages){
+    try{
+     const pages=await getJson(`${API}/repos/${repo.full_name}/pages`);
+     item.homepage=trustedGitHubPagesSite(pages.html_url);
+    }catch(error){console.warn(`GitHub Pages lookup: ${repo.full_name}: ${error.message}`);}
+   }
+  }
+  fresh.push(item);
+ }
+ // If Supabase fails, stop instead of reporting an incomplete successful run.
+ await upsert(fresh);
+ for(const item of fresh)knownIds.add(item.id);
+ inserted+=fresh.length;
+ console.log(`[${track}] ${search} page ${page}: ${results.items?.length||0} matches, ${fresh.length} new, ${existing.size} already in database`);
  await sleep(2400);
 }
 if(successful===0||successful<Math.ceil(jobs.length*.7))
  throw new Error(`Discovery incomplete: ${successful}/${jobs.length} searches succeeded, ${failed} failed.`);
-console.log(`Discovery complete: ${collected.size} unique eligible original repositories processed, ${successful}/${jobs.length} searches succeeded. Records are upserted by GitHub ID, so repeated sightings do not create duplicates.`);
+console.log(`Discovery complete: ${inserted} new repositories, ${skippedExisting} existing IDs, ${skippedInRun} repeats within run; ${successful}/${jobs.length} queries succeeded. Quality exclusions: ${JSON.stringify(Object.fromEntries(qualityStats))}. No existing data overwritten.`);
