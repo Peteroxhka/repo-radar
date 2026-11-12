@@ -1,3 +1,4 @@
+import {normalizeSearch, mergeMessages, isCurrentChat} from "./lib/core.mjs";
 import {createClient} from "https://esm.sh/@supabase/supabase-js@2.57.0";
 import {SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, DATABASE_SCHEMA} from "./config.js";
 const sb=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{db:{schema:DATABASE_SCHEMA},auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
@@ -23,8 +24,10 @@ const blockedMime=/x-msdownload|x-executable|x-sh|x-bat|x-dosexec|javascript|tex
 let locale=localStorage.getItem("radar-locale")||((navigator.language||"ru").slice(0,2));
 if(!translations[locale])locale="en";
 let theme=localStorage.getItem("radar-theme")||"dark";if(!["dark","light","cosmic"].includes(theme))theme="dark";
-let state={category:"all",language:"",search:"",user:null,profile:null,peer:null,allRows:[],totalCount:0,catalogTotal:0,categoryCounts:{},categoryCountsLoaded:false,hasMore:true,loading:false,languageOptions:[],languageOptionsLoaded:false,listRequestId:0,searchTimer:null,seen:new Map(),sub:null,refreshTimer:null,register:false};
+let state={chatEpoch:0,messageBusy:false,historyCursor:null,historyMore:false,contactRequest:0,category:"all",language:"",search:"",user:null,profile:null,peer:null,allRows:[],totalCount:0,catalogTotal:0,categoryCounts:{},categoryCountsLoaded:false,hasMore:true,loading:false,languageOptions:[],languageOptionsLoaded:false,listRequestId:0,searchTimer:null,seen:new Map(),sub:null,refreshTimer:null,register:false};
 const categoryLabels={ru:"Без категории",en:"Unclassified",es:"Sin categoría",fr:"Sans catégorie",de:"Nicht kategorisiert",pt:"Sem categoria",zh:"未分类",ja:"未分類",ko:"미분류",ar:"غير مصنف",hi:"अवर्गीकृत",tr:"Kategorisiz"};
+Object.assign(translations.ru,{olderMessages:"Предыдущие сообщения",ps4Title:"Мир PlayStation 4",ps4Intro:"Инструменты разработки, эмуляция и проекты сообщества PS4.",ps4Source:"Открыть репозиторий",ps4Search:"Найти PS4 в каталоге",ps4Reference:"Проект из твоей подборки",ps4Sdk:"Открытый модульный SDK для разработки под PS4.",ps4Toolchain:"Инструменты и примеры для создания домашних приложений PS4.",ps4Emulator:"Эмулятор PlayStation 4 для компьютера.",cleanupFailed:"Сообщение не отправлено. Не удалось удалить вложение из хранилища.",messageTooLong:"Сообщение не должно превышать 4000 символов."});
+Object.assign(translations.en,{olderMessages:"Older messages",ps4Title:"The PlayStation 4 world",ps4Intro:"Development tools, emulation and PS4 community projects.",ps4Source:"Open repository",ps4Search:"Find PS4 in the catalog",ps4Reference:"Project from your collection",ps4Sdk:"An open modular SDK for PS4 development.",ps4Toolchain:"Tools and examples for building PS4 homebrew applications.",ps4Emulator:"A PlayStation 4 emulator for desktop computers.",cleanupFailed:"Message not sent. The attachment could not be removed from storage.",messageTooLong:"Messages must not exceed 4000 characters."});
 function t(k){if(k==="other")return categoryLabels[locale]??"Unclassified";return translations[locale]?.[k]??translations.en[k]??k;}
 function setStatus(id,message,isError=false){const el=$(id);if(!el)return;el.textContent=message;el.classList.toggle("error",isError);}
 function safeErr(e){console.error("Repo Radar:",e);return e?.message||t("error");}
@@ -62,7 +65,7 @@ if(requestId!==state.listRequestId)return;
 let query=sb.from("repos").select("id,full_name,description,html_url,language,stars,license_spdx,category,pushed_at",{count:"exact"});
 if(state.category!=="all")query=query.eq("category",state.category);
 if(state.language)query=query.eq("language",state.language);
-const term=state.search.replace(/[^\\p{L}\\p{N}\\s._/-]/gu," ").replace(/\\s+/g," ").trim().slice(0,80);
+const term=normalizeSearch(state.search);
 if(term)query=query.or(`full_name.ilike.%${term}%,description.ilike.%${term}%`);
 query=query.order("stars",{ascending:false}).order("id",{ascending:false}).range(offset,offset+REPO_PAGE_SIZE-1);
 const{data,error,count}=await query;
@@ -76,13 +79,13 @@ $("repo-count").textContent=state.totalCount.toLocaleString(locale);
 await updateLanguageOptions();
 if(requestId!==state.listRequestId)return;
 renderRepos();
-more.hidden=!state.hasMore;
+more.hidden=!state.hasMore;$("load-more-wrap").hidden=!state.hasMore;
 setStatus("status",`${state.allRows.length.toLocaleString(locale)} / ${state.totalCount.toLocaleString(locale)}`);
 }
 catch(e){
 if(requestId!==state.listRequestId)return;
 setStatus("status",safeErr(e),true);
-more.hidden=!state.hasMore;
+more.hidden=!state.hasMore;$("load-more-wrap").hidden=!state.hasMore;
 if(reset)$("grid").replaceChildren();
 }
 finally{
@@ -90,17 +93,20 @@ if(requestId===state.listRequestId){state.loading=false;more.disabled=false;}
 }}
 
 $("language").onchange=e=>{state.language=e.target.value;loadRepos(true);};
-$("repo-search").oninput=e=>{state.search=e.target.value.trim();clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>loadRepos(true),250);};
+$("repo-search").oninput=e=>{state.search=e.target.value.trim();state.listRequestId+=1;state.loading=true;clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>loadRepos(true),250);};
 $("load-more").onclick=()=>loadRepos(false);
 if("IntersectionObserver" in window){
 const catalogObserver=new IntersectionObserver(entries=>{
-if(entries.some(entry=>entry.isIntersecting)&&state.hasMore&&!state.loading)loadRepos(false);
+if(!$("view-discover").classList.contains("hidden")&&entries.some(entry=>entry.isIntersecting)&&state.hasMore&&!state.loading)loadRepos(false);
 },{root:null,rootMargin:"900px 0px 900px 0px",threshold:0});
 catalogObserver.observe($("load-more-sentinel"));
 }
-function showTab(tab){const messages=tab==="messages";$("view-discover").classList.toggle("hidden",messages);$("view-messages").classList.toggle("hidden",!messages);
-$("tab-messages").classList.toggle("active",messages);$("tab-discover").classList.toggle("active",!messages);if(messages&&state.user)loadContacts();}
-$("tab-discover").onclick=()=>showTab("discover");$("tab-messages").onclick=()=>showTab("messages");
+function showTab(tab){
+for(const name of ["discover","messages","ps4"]){$("view-"+name).classList.toggle("hidden",tab!==name);$("tab-"+name).classList.toggle("active",tab===name);}
+if(tab==="messages"&&state.user)loadContacts();
+}
+$("tab-discover").onclick=()=>showTab("discover");$("tab-messages").onclick=()=>showTab("messages");$("tab-ps4").onclick=()=>showTab("ps4");
+$("ps4-catalog-search").onclick=()=>{state.category="all";state.language="";state.search="ps4";$("repo-search").value="ps4";$("language").value="";renderCategories();showTab("discover");loadRepos(true);};
 function openDialog(id){$(id).showModal();}document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.close).close());
 function setRegister(enabled){state.register=enabled;$("username-label").classList.toggle("hidden",!enabled);$("auth-username").required=enabled;$("auth-password").autocomplete=enabled?"new-password":"current-password";localized();}
 $("auth-open").onclick=()=>{setRegister(false);openDialog("auth-dialog");};$("chat-login").onclick=()=>$("auth-open").click();
@@ -131,41 +137,95 @@ let image=state.profile.avatar_url;const file=$("avatar-file").files[0];
 if(file&&!githubAccount()){if(file.size>5*1024*1024||!["image/jpeg","image/png","image/webp","image/gif"].includes(file.type))throw Error(t("unsupportedFile"));const ext=file.type.split("/")[1]==="jpeg"?"jpg":file.type.split("/")[1];const path=state.user.id+"/"+crypto.randomUUID()+"."+ext;const {error:upErr}=await sb.storage.from("repo-radar-avatars").upload(path,file,{contentType:file.type,upsert:false});if(upErr)throw upErr;const{data}=sb.storage.from("repo-radar-avatars").getPublicUrl(path);image=data.publicUrl;}
 const{error}=await sb.from("profiles").update({username:name,avatar_url:image}).eq("id",state.user.id);if(error)throw error;await fetchProfile();$("avatar-file").value="";setStatus("profile-status",t("saved"));}catch(err){setStatus("profile-status",safeErr(err),true);}finally{button.disabled=false;}};
 $("signout").onclick=async()=>{const{error}=await sb.auth.signOut();if(error){setStatus("profile-status",safeErr(error),true);return;}$("profile-dialog").close();};
-function stopChat(){if(state.sub){sb.removeChannel(state.sub);state.sub=null;}if(state.refreshTimer){clearInterval(state.refreshTimer);state.refreshTimer=null;}state.peer=null;state.seen.clear();$("chat-messages").replaceChildren();$("conversation-list").replaceChildren();$("chat-partner").textContent=t("chooseChat");$("message-input").disabled=true;$("message-send").disabled=true;}
+function stopChat(){setStatus("chat-status","");$("file-input").disabled=true;state.chatEpoch+=1;state.contactRequest+=1;state.messageBusy=false;state.historyCursor=null;state.historyMore=false;$("chat-history").hidden=true;$("message-input").value="";$("file-input").value="";setStatus("file-preview","");delete $("chat-messages").dataset.lastId;if(state.sub){sb.removeChannel(state.sub);state.sub=null;}if(state.refreshTimer){clearInterval(state.refreshTimer);state.refreshTimer=null;}state.peer=null;state.seen.clear();$("chat-messages").replaceChildren();$("conversation-list").replaceChildren();$("chat-partner").textContent=t("chooseChat");$("message-input").disabled=true;$("message-send").disabled=true;}
 async function onSession(){const{data:{user}}=await sb.auth.getUser();const previous=state.user?.id;state.user=user||null;if(previous&&previous!==user?.id)stopChat();if(!user)stopChat();
 $("auth-open").classList.toggle("hidden",!!user);$("profile-open").classList.toggle("hidden",!user);$("chat-guest").classList.toggle("hidden",!!user);$("chat-app").classList.toggle("hidden",!user);
 if(user){await fetchProfile();if(!$("view-messages").classList.contains("hidden"))await loadContacts();}}
 sb.auth.onAuthStateChange(()=>{setTimeout(()=>onSession().catch(e=>console.error(e)),0);});
 async function findUsersById(ids){if(!ids.length)return new Map();const{data,error}=await sb.from("profiles").select("id,username,avatar_url").in("id",ids);if(error)throw error;return new Map((data||[]).map(u=>[u.id,u]));}
-async function loadContacts(){if(!state.user)return;try{
-const{data,error}=await sb.from("direct_messages").select("sender_id,recipient_id,created_at").or("sender_id.eq."+state.user.id+",recipient_id.eq."+state.user.id).order("created_at",{ascending:false}).limit(250);
-if(error)throw error;const ids=[...new Set((data||[]).map(m=>m.sender_id===state.user.id?m.recipient_id:m.sender_id))];if(state.peer&&!ids.includes(state.peer.id))ids.unshift(state.peer.id);
-const people=await findUsersById(ids);$("conversation-list").replaceChildren(...ids.filter(id=>people.has(id)).map(id=>{
-const p=people.get(id);const b=document.createElement("button");b.type="button";b.className="conversation"+(state.peer?.id===id?" active":"");const av=document.createElement("span");av.className="conversation-mark";av.textContent=p.username[0]?.toUpperCase()||"?";const label=document.createElement("span");label.textContent=p.username;b.append(av,label);b.onclick=()=>selectPeer(p);return b;}));if(!ids.length)$("conversation-list").textContent=t("noChat");
-}catch(e){setStatus("find-status",safeErr(e),true);}}
+async function loadContacts(){
+const userId=state.user?.id,request=++state.contactRequest;if(!userId)return;
+const current=()=>state.user?.id===userId&&request===state.contactRequest;
+try{
+const ids=[];let offset=0;
+// Page distinct peers on the server, rather than cutting off message history.
+for(;;){
+const {data,error}=await sb.rpc("list_dm_contacts",{page_offset:offset,page_size:100});
+if(!current())return;
+if(error){
+// Compatibility with databases that have not applied the new RPC yet.
+if(!["PGRST202","42883"].includes(error.code))throw error;
+ids.length=0;let cursor=null;const unique=new Set();
+for(;;){
+let q=sb.from("direct_messages").select("id,sender_id,recipient_id").or("sender_id.eq."+userId+",recipient_id.eq."+userId).order("id",{ascending:true}).limit(500);
+if(cursor)q=q.gt("id",cursor);
+const result=await q;if(!current())return;if(result.error)throw result.error;
+for(const m of result.data||[])unique.add(m.sender_id===userId?m.recipient_id:m.sender_id);
+if((result.data||[]).length<500)break;cursor=result.data.at(-1).id;
+}ids.push(...unique);break;
+}
+ids.push(...(data||[]).map(row=>row.peer_id));if((data||[]).length<100)break;offset+=100;
+}
+if(state.peer&&!ids.includes(state.peer.id))ids.unshift(state.peer.id);
+const people=new Map();for(let i=0;i<ids.length;i+=100){for(const [id,p] of await findUsersById(ids.slice(i,i+100)))people.set(id,p);if(!current())return;}
+$("conversation-list").replaceChildren(...ids.filter(id=>people.has(id)).map(id=>{
+const p=people.get(id),b=document.createElement("button");b.type="button";b.className="conversation"+(state.peer?.id===id?" active":"");const av=document.createElement("span");av.className="conversation-mark";av.textContent=p.username[0]?.toUpperCase()||"?";const label=document.createElement("span");label.textContent=p.username;b.append(av,label);b.onclick=()=>selectPeer(p);return b;}));
+if(!ids.length)$("conversation-list").textContent=t("noChat");
+}catch(e){if(current())setStatus("find-status",safeErr(e),true);}}
 $("find-user").onclick=async()=>{if(!state.user)return;const username=$("user-search").value.trim().toLowerCase();if(!/^[a-z0-9_]{3,24}$/.test(username)){setStatus("find-status",t("userNotFound"),true);return;}try{const{data,error}=await sb.from("profiles").select("id,username,avatar_url").eq("username",username).maybeSingle();if(error)throw error;if(!data){setStatus("find-status",t("userNotFound"),true);return;}if(data.id===state.user.id){setStatus("find-status",t("sameUser"),true);return;}setStatus("find-status","");await selectPeer(data);}catch(e){setStatus("find-status",safeErr(e),true);}};
-async function selectPeer(person){stopChat();state.peer=person;$("chat-partner").textContent="@"+person.username;$("message-input").disabled=false;$("message-send").disabled=false;
-await loadMessages();await loadContacts();const channel=sb.channel("radar-dm-"+state.user.id+"-"+person.id).on("postgres_changes",{event:"INSERT",schema:"repo_radar",table:"direct_messages",filter:"recipient_id=eq."+state.user.id},()=>loadMessages()).subscribe();
-state.sub=channel;state.refreshTimer=setInterval(()=>{if(state.peer&&state.user)loadMessages();},12000);
-$("message-input").focus();}
-async function loadMessages(){const userId=state.user?.id,peerId=state.peer?.id;if(!userId||!peerId)return;
-try{const{data,error}=await sb.from("direct_messages").select("id,sender_id,recipient_id,content,file_path,file_name,file_type,file_size,created_at").or("and(sender_id.eq."+userId+",recipient_id.eq."+peerId+"),and(sender_id.eq."+peerId+",recipient_id.eq."+userId+")").order("created_at",{ascending:false}).limit(100);if(error)throw error;if(state.peer?.id!==peerId)return;
-const messages=(data||[]).reverse();const box=$("chat-messages");const nearBottom=box.scrollHeight-box.scrollTop-box.clientHeight<100;const already=box.dataset.lastId;
+async function selectPeer(person){
+stopChat();state.peer=person;const epoch=state.chatEpoch,userId=state.user?.id;if(!userId)return;
+$("chat-partner").textContent="@"+person.username;$("file-input").disabled=false;$("message-input").disabled=false;$("message-send").disabled=false;
+const current=()=>isCurrentChat(state,epoch,userId,person.id);
+// Install resources before awaiting requests: a new selection can always clean them up.
+state.sub=sb.channel("radar-dm-"+userId+"-"+epoch).on("postgres_changes",{event:"INSERT",schema:"repo_radar",table:"direct_messages",filter:"recipient_id=eq."+userId},()=>{if(current()){loadMessages();loadContacts();}}).subscribe();
+state.refreshTimer=setInterval(()=>{if(current()){loadMessages();loadContacts();}},12000);
+await loadMessages();if(!current())return;await loadContacts();if(current())$("message-input").focus();
+}
+$("chat-history").onclick=()=>loadMessages(true);
+async function loadMessages(older=false){
+const userId=state.user?.id,peerId=state.peer?.id,epoch=state.chatEpoch;
+if(!userId||!peerId||state.messageBusy||(older&&!state.historyMore))return;
+const current=()=>isCurrentChat(state,epoch,userId,peerId);state.messageBusy=true;$("chat-history").disabled=true;
+try{
+let q=sb.from("direct_messages").select("id,sender_id,recipient_id,content,file_path,file_name,file_type,file_size,created_at").or("and(sender_id.eq."+userId+",recipient_id.eq."+peerId+"),and(sender_id.eq."+peerId+",recipient_id.eq."+userId+")").order("created_at",{ascending:false}).order("id",{ascending:false});
+const first=state.seen.size===0;
+if(older&&state.historyCursor){const c=state.historyCursor;q=q.or(`created_at.lt.${c.created_at},and(created_at.eq.${c.created_at},id.lt.${c.id})`);}
+else if(!first){const latest=Array.from(state.seen.values()).at(-1);q=q.or(`created_at.gt.${latest.created_at},and(created_at.eq.${latest.created_at},id.gt.${latest.id})`);}
+const {data,error}=await q.limit(100);if(!current())return;if(error)throw error;
+let page=data||[];
+// Catch up all unseen messages after a suspended tab, without gaps over 100 rows.
+if(!older&&!first&&page.length===100){
+const latest=Array.from(state.seen.values()).at(-1);let tail=page.at(-1);
+while(true){
+const {data:batch,error:batchError}=await sb.from("direct_messages").select("id,sender_id,recipient_id,content,file_path,file_name,file_type,file_size,created_at").or("and(sender_id.eq."+userId+",recipient_id.eq."+peerId+"),and(sender_id.eq."+peerId+",recipient_id.eq."+userId+")").or(`created_at.gt.${latest.created_at},and(created_at.eq.${latest.created_at},id.gt.${latest.id})`).or(`created_at.lt.${tail.created_at},and(created_at.eq.${tail.created_at},id.lt.${tail.id})`).order("created_at",{ascending:false}).order("id",{ascending:false}).limit(100);
+if(!current())return;if(batchError)throw batchError;page.push(...(batch||[]));if((batch||[]).length<100)break;tail=batch.at(-1);
+}}
+if(first||older){state.historyCursor=page.at(-1)||state.historyCursor;state.historyMore=page.length===100;}
+const messages=mergeMessages(Array.from(state.seen.values()),page);state.seen=new Map(messages.map(m=>[m.id,m]));
+const box=$("chat-messages"),height=box.scrollHeight,top=box.scrollTop,nearBottom=height-top-box.clientHeight<100;
 const frag=document.createDocumentFragment();
 for(const m of messages){const div=document.createElement("div");div.className="message"+(m.sender_id===userId?" mine":"");
 if(m.content){const p=document.createElement("p");p.className="message-text";p.textContent=m.content;div.append(p);}
-if(m.file_path){const a=document.createElement("button");a.className="attachment-link";a.textContent="📎 "+(m.file_name||"Attachment");a.type="button";a.onclick=async()=>{try{const{data:link,error:linkError}=await sb.storage.from("repo-radar-dm").createSignedUrl(m.file_path,60);if(linkError)throw linkError;window.open(link.signedUrl,"_blank","noopener,noreferrer");}catch(e){setStatus("chat-status",safeErr(e),true);}};div.append(a);}
-const tm=document.createElement("div");tm.className="message-time";tm.textContent=new Date(m.created_at).toLocaleTimeString(locale,{hour:"2-digit",minute:"2-digit"});div.append(tm);frag.append(div);}
-box.replaceChildren(frag);box.dataset.lastId=messages.at(-1)?.id||"";if(nearBottom||already!==box.dataset.lastId)box.scrollTop=box.scrollHeight;setStatus("chat-status","");
-}catch(e){setStatus("chat-status",safeErr(e),true);}}
+if(m.file_path){const a=document.createElement("button");a.className="attachment-link";a.textContent="📎 "+(m.file_name||"Attachment");a.type="button";a.onclick=async()=>{
+// Open synchronously so mobile popup blockers do not discard the user gesture.
+const win=window.open("about:blank","_blank");if(win)win.opener=null;
+try{const{data:link,error:linkError}=await sb.storage.from("repo-radar-dm").createSignedUrl(m.file_path,60);if(linkError)throw linkError;if(win)win.location.replace(link.signedUrl);else location.assign(link.signedUrl);}catch(e){if(win)win.close();if(current())setStatus("chat-status",safeErr(e),true);}};div.append(a);}
+const tm=document.createElement("div");tm.className="message-time";tm.textContent=new Date(m.created_at).toLocaleString(locale,{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});div.append(tm);frag.append(div);}
+box.replaceChildren(frag);if(older)box.scrollTop=top+box.scrollHeight-height;else if(first||nearBottom)box.scrollTop=box.scrollHeight;
+$("chat-history").hidden=!state.historyMore;
+}catch(e){if(current())setStatus("chat-status",safeErr(e),true);}finally{if(current()){state.messageBusy=false;$("chat-history").disabled=false;}}
+}
 $("file-input").onchange=()=>{const file=$("file-input").files[0];setStatus("file-preview",file?("📎 "+file.name+" ("+Math.ceil(file.size/1024)+" KB)"):"");};
-$("message-form").onsubmit=async e=>{e.preventDefault();const peer=state.peer,user=state.user;if(!peer||!user)return;const message=$("message-input").value.trim();const file=$("file-input").files[0];if(!message&&!file)return;const button=$("message-send");button.disabled=true;setStatus("chat-status",t("busy"));try{
+$("message-form").onsubmit=async e=>{e.preventDefault();const peer=state.peer,user=state.user;if(!peer||!user||$("message-send").disabled)return;const message=$("message-input").value.trim();const file=$("file-input").files[0];if(!message&&!file)return;if(Array.from(message).length>4000){setStatus("chat-status",t("messageTooLong"),true);return;}const epoch=state.chatEpoch;const current=()=>isCurrentChat(state,epoch,user.id,peer.id);const button=$("message-send");button.disabled=true;$("message-input").disabled=true;$("file-input").disabled=true;setStatus("chat-status",t("busy"));try{
 let file_path=null,file_name=null,file_type=null,file_size=null;
 if(file){if(file.size>25*1024*1024)throw Error(t("fileTooLarge"));const ext=file.name.split(".").pop()?.toLowerCase();if(!allowedExt.has(ext)||blockedMime.test(file.type||""))throw Error(t("unsupportedFile"));
 file_name=file.name.slice(0,180);file_type=file.type||"application/octet-stream";file_size=file.size;
 file_path=user.id+"/"+peer.id+"/"+crypto.randomUUID()+"."+ext;const{error:uploadError}=await sb.storage.from("repo-radar-dm").upload(file_path,file,{contentType:file_type,upsert:false});if(uploadError)throw uploadError;}
 const {error}=await sb.from("direct_messages").insert({sender_id:user.id,recipient_id:peer.id,content:message,file_path,file_name,file_type,file_size});
-if(error){if(file_path)await sb.storage.from("repo-radar-dm").remove([file_path]);throw error;}
+if(error){if(file_path){const cleanup=await sb.storage.from("repo-radar-dm").remove([file_path]);if(cleanup.error||!cleanup.data?.length)throw Error(t("cleanupFailed"));}throw error;}
+if(!current())return;setStatus("chat-status","");
 $("message-input").value="";$("file-input").value="";setStatus("file-preview","");await loadMessages();await loadContacts();
-}catch(err){setStatus("chat-status",safeErr(err),true);}finally{button.disabled=false;}};
+}catch(err){if(current())setStatus("chat-status",safeErr(err),true);}finally{if(current()){button.disabled=false;$("message-input").disabled=false;$("file-input").disabled=false;}}};
 localized();onSession().catch(e=>console.error(e));loadRepos();
+
