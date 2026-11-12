@@ -5,10 +5,12 @@ on:
     branches: [main]
     paths:
       - "scripts/collect.mjs"
+      - "lib/discovery-plan.mjs"
+      - "tests/discovery-plan.test.mjs"
       - ".github/workflows/collect.yml"
       - "supabase/migrations/**"
   schedule:
-    - cron: "0 * * * *"
+    - cron: "23 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -27,6 +29,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Check discovery plan and tests
+        run: |
+          node --check scripts/collect.mjs
+          node --check lib/discovery-plan.mjs
+          node --test tests/discovery-plan.test.mjs
       - name: Collect public GitHub catalog
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,5 +1,6 @@
 // Curated discovery from GitHub search. Never bulk-import incomplete /repositories entries.
 import {isConsoleWebKit, trustedGitHubPagesSite} from "../lib/catalog.mjs";
+import {buildDiscoveryPlan,discoverySlot} from "../lib/discovery-plan.mjs";
 const API="https://api.github.com";
 const BASE=process.env.SUPABASE_URL;
 const KEY=process.env.SUPABASE_SERVICE_KEY;
@@ -135,20 +136,25 @@ async function syncFeaturedOriginals(){
 }
 await syncFeaturedOriginals();
 
-const recent=Date.now()/3600000|0;
-const sort=recent%2===0?"stars":"updated";
+const recent=discoverySlot();
+const sort=recent%3===0?"updated":"stars";
+const jobs=buildDiscoveryPlan(QUERIES,recent);
+console.log(`Discovery plan: ${jobs.length} searches, ${jobs.filter(x=>x.track==="rotating").length} rotating topics, ${jobs.filter(x=>x.track==="deep").length} deeper pages, sorting by ${sort}`);
 const collected=new Map();
 const persisted=new Set();
-let successful=0;
-for(const [category,search] of QUERIES){
+let successful=0,failed=0;
+for(const {category,search,page,track} of jobs){
  const q=`${search} fork:false archived:false stars:>=2`;
- const url=`${API}/search/repositories?q=${encodeURIComponent(q)}&sort=${sort}&order=desc&per_page=100`;
+ const url=`${API}/search/repositories?q=${encodeURIComponent(q)}&sort=${sort}&order=desc&per_page=100&page=${page}`;
  try{
   const results=await getJson(url);
   successful++;
   const fresh=[];
   for(const repo of results.items||[]){
-   if(!repo.id||!repo.name||!repo.html_url||repo.fork||repo.archived)continue;
+   if(!repo.id||!repo.name||!repo.html_url||repo.fork||repo.archived||repo.private)continue;
+   // Preserve rare console-WebKit projects even when descriptions are sparse,
+   // but don't fill other categories with empty low-star placeholders.
+   if((repo.description||"").trim().length<8&&repo.stargazers_count<8&&category!=="console_webkit")continue;
    const entry=row(repo,category);
    // Only actual console WebKit projects may enter this focused category.
    if(category==="console_webkit"&&entry.category!=="console_webkit")continue;
@@ -167,9 +173,13 @@ for(const [category,search] of QUERIES){
   }
   await upsert(fresh);
   for(const item of fresh)persisted.add(item.id);
-  console.log(`${search}: ${results.items?.length||0} matches; ${fresh.length} saved`);
- }catch(error){console.error(`Search failed (${search}): ${error.message}`);}
+  console.log(`[${track}] ${search} page ${page}: ${results.items?.length||0} matches, ${fresh.length} eligible saved`);
+ }catch(error){
+  failed++;
+  console.error(`Search failed (${search} page ${page}): ${error.message}`);
+ }
  await sleep(2400);
 }
-if(successful===0)throw new Error("All GitHub discovery searches failed.");
-console.log(`Discovery complete: ${collected.size} unique original repositories, ${successful}/${QUERIES.length} queries succeeded.`);
+if(successful===0||successful<Math.ceil(jobs.length*.7))
+ throw new Error(`Discovery incomplete: ${successful}/${jobs.length} searches succeeded, ${failed} failed.`);
+console.log(`Discovery complete: ${collected.size} unique eligible original repositories processed, ${successful}/${jobs.length} searches succeeded. Records are upserted by GitHub ID, so repeated sightings do not create duplicates.`);
