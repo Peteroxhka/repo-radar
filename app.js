@@ -1,5 +1,6 @@
 import {normalizeSearch, mergeMessages, isCurrentChat, dmConversationFilter, attachmentMime} from "./lib/core.mjs";
 import {createClient} from "https://esm.sh/@supabase/supabase-js@2.57.0";
+import {trustedGitHubPagesSite} from "./lib/catalog.mjs";
 import {SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, DATABASE_SCHEMA} from "./config.js";
 const sb=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{db:{schema:DATABASE_SCHEMA},auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const $=id=>document.getElementById(id);
@@ -22,7 +23,9 @@ translations.ru.officialRadar="Официальный проект Repo Radar";
 translations.en.officialRadar="Official Repo Radar project";
 translations.ru.visitSite="Открыть сайт проекта";
 translations.en.visitSite="Visit project website";
-const categoryKeys=["all","programming","tools","ai","data","web","learning","games","other"];
+translations.ru.console_webkit="Консольные WebKit";
+translations.en.console_webkit="Console WebKit";
+const categoryKeys=["all","programming","tools","ai","data","web","learning","games","console_webkit","other"];
 const localeNames={ru:"Русский",en:"English",es:"Español",fr:"Français",de:"Deutsch",pt:"Português",zh:"中文",ja:"日本語",ko:"한국어",ar:"العربية",hi:"हिन्दी",tr:"Türkçe"};
 const allowedExt=new Set(["jpg","jpeg","png","webp","gif","bmp","heic","mp4","webm","mov","m4v","mp3","ogg","wav","m4a","aac","flac","pdf","txt","md","csv","json","doc","docx","xls","xlsx","ppt","pptx","odt","ods","odp","zip","7z","rar"]);
 const blockedMime=/x-msdownload|x-executable|x-sh|x-bat|x-dosexec|javascript|text\/html|svg\+xml/i;
@@ -59,7 +62,7 @@ const things=[[r.owner_login,"repo-owner"],[r.language,"repo-tag"],["★ "+numbe
 for(const [str,cls] of things){const item=document.createElement("span");if(cls)item.className=cls;item.textContent=str;meta.append(item);}
 if(r.full_name?.toLowerCase()==="peteroxhka/repo-radar"){const badge=document.createElement("span");badge.className="official-project-tag";badge.textContent=t("officialRadar");card.append(badge);}
 card.append(title,desc,meta);
-const projectSite=featuredSiteLinks[r.full_name?.toLowerCase()];
+const projectSite=trustedGitHubPagesSite(r.site_url)||featuredSiteLinks[r.full_name?.toLowerCase()];
 if(projectSite){const site=document.createElement("a");site.className="project-site-link";site.href=projectSite;site.target="_blank";site.rel="noopener noreferrer";site.textContent=t("visitSite");card.append(site);}
 frag.append(card);} $("grid").replaceChildren(frag);}
 async function loadRepos(reset=true){
@@ -83,7 +86,17 @@ const{data,error}=await sb.rpc("search_catalog",{
 if(requestId!==state.listRequestId)return;
 if(error)throw error;
 const page=data||[];
-state.allRows=reset?page:state.allRows.concat(page);
+let siteById=new Map();
+if(page.length){
+ try{
+  const {data:sites,error:sitesError}=await sb.rpc("list_catalog_sites",{repo_ids:page.map(r=>r.id)});
+  if(sitesError)throw sitesError;
+  siteById=new Map((sites||[]).map(r=>[String(r.id),trustedGitHubPagesSite(r.homepage)]).filter(([,url])=>!!url));
+ }catch(siteError){console.warn("GitHub Pages links unavailable:",siteError.message);}
+}
+if(requestId!==state.listRequestId)return;
+const enriched=page.map(r=>({...r,site_url:siteById.get(String(r.id))||null}));
+state.allRows=reset?enriched:state.allRows.concat(enriched);
 state.totalCount=Number(page[0]?.total_count??(reset?0:state.totalCount));
 state.hasMore=page.length===REPO_PAGE_SIZE&&state.allRows.length<state.totalCount;
 $("repo-count").textContent=state.totalCount.toLocaleString(locale);
@@ -115,11 +128,10 @@ if(!$("view-discover").classList.contains("hidden")&&entries.some(entry=>entry.i
 catalogObserver.observe($("load-more-sentinel"));
 }
 function showTab(tab){
-for(const name of ["discover","messages","ps4"]){$("view-"+name).classList.toggle("hidden",tab!==name);$("tab-"+name).classList.toggle("active",tab===name);}
+for(const name of ["discover","messages"]){$("view-"+name).classList.toggle("hidden",tab!==name);$("tab-"+name).classList.toggle("active",tab===name);}
 if(tab==="messages"&&state.user)loadContacts();
 }
-$("tab-discover").onclick=()=>showTab("discover");$("tab-messages").onclick=()=>showTab("messages");$("tab-ps4").onclick=()=>showTab("ps4");
-$("ps4-catalog-search").onclick=()=>{state.category="all";state.language="";state.search="ps4";$("repo-search").value="ps4";$("language").value="";renderCategories();showTab("discover");loadRepos(true);};
+$("tab-discover").onclick=()=>showTab("discover");$("tab-messages").onclick=()=>showTab("messages");
 function openDialog(id){if(!$(id).open)$(id).showModal();}document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.close).close());
 // OAuth provider failures are returned through query/hash parameters. Display
 // the explanation instead of silently landing on an unauthenticated home page.

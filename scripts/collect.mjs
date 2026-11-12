@@ -1,4 +1,5 @@
 // Curated discovery from GitHub search. Never bulk-import incomplete /repositories entries.
+import {isConsoleWebKit, trustedGitHubPagesSite} from "../lib/catalog.mjs";
 const API="https://api.github.com";
 const BASE=process.env.SUPABASE_URL;
 const KEY=process.env.SUPABASE_SERVICE_KEY;
@@ -6,6 +7,14 @@ const TOKEN=process.env.GH_TOKEN;
 if(!BASE||!KEY||!TOKEN)throw new Error("Missing Supabase or GitHub Actions credentials.");
 
 const QUERIES=[
+ ["console_webkit","webkit ps4 in:name,description"],
+ ["console_webkit","webkit ps5 in:name,description"],
+ ["console_webkit","webkit playstation in:name,description"],
+ ["console_webkit","webkit ps3 in:name,description"],
+ ["console_webkit","webkit ps vita in:name,description"],
+ ["console_webkit","webkit wii u in:name,description"],
+ ["console_webkit","webkit xbox in:name,description"],
+ ["console_webkit","webkit nintendo switch in:name,description"],
  ["games","ps4 in:name"],["games","topic:ps4"],["ai","chatgpt in:name"],
  ["games","minecraft in:name"],["games","ps3 in:name"],["ai","ollama in:name"],
  ["programming","topic:javascript"],["programming","topic:python"],
@@ -23,6 +32,7 @@ const QUERIES=[
 ];
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 function classify(repo,fallback){
+ if(isConsoleWebKit(repo))return "console_webkit";
  const topics=(repo.topics||[]).join(" ").toLowerCase();
  const text=`${repo.name||""} ${repo.description||""} ${topics}`.toLowerCase();
  if(/\b(llm|chatgpt|ollama|machine.learning|artificial.intelligence|neural.network)\b/i.test(text))return "ai";
@@ -136,8 +146,21 @@ for(const [category,search] of QUERIES){
   const fresh=[];
   for(const repo of results.items||[]){
    if(!repo.id||!repo.name||!repo.html_url||repo.fork||repo.archived)continue;
-   collected.set(repo.id,row(repo,category));
-   if(!persisted.has(repo.id))fresh.push(row(repo,category));
+   const entry=row(repo,category);
+   // Only actual console WebKit projects may enter this focused category.
+   if(category==="console_webkit"&&entry.category!=="console_webkit")continue;
+   if(entry.category==="console_webkit"){
+    const direct=trustedGitHubPagesSite(repo.homepage);
+    if(direct)entry.homepage=direct;
+    else if(repo.has_pages){
+     try{
+      const pages=await getJson(`${API}/repos/${repo.full_name}/pages`);
+      entry.homepage=trustedGitHubPagesSite(pages.html_url);
+     }catch(error){console.warn(`No public GitHub Pages metadata for ${repo.full_name}: ${error.message}`);}
+    }
+   }
+   collected.set(repo.id,entry);
+   if(!persisted.has(repo.id))fresh.push(entry);
   }
   await upsert(fresh);
   for(const item of fresh)persisted.add(item.id);

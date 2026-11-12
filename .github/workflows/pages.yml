@@ -26,6 +26,7 @@ jobs:
         run: |
           node --input-type=module --check < app.js
           node --check lib/core.mjs
+          node --check lib/catalog.mjs
           node --check scripts/collect.mjs
           node --test tests/*.test.mjs
       - uses: actions/configure-pages@v5
