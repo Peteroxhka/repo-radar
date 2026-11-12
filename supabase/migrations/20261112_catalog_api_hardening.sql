@@ -24,3 +24,19 @@ for all
 to anon, authenticated
 using (false)
 with check (false);
+
+
+create or replace function repo_radar.list_repo_category_counts()
+returns table(category text, total bigint)
+language sql
+stable
+security invoker
+set search_path = repo_radar
+as $$
+  select r.category, count(*)::bigint
+  from repo_radar.repos as r
+  group by r.category
+  order by r.category;
+$$;
+revoke all on function repo_radar.list_repo_category_counts() from public;
+grant execute on function repo_radar.list_repo_category_counts() to anon, authenticated;
