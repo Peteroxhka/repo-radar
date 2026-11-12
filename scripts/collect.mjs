@@ -2,6 +2,7 @@
 import {isConsoleWebKit, trustedGitHubPagesSite} from "../lib/catalog.mjs";
 import {buildDiscoveryPlan,discoverySlot} from "../lib/discovery-plan.mjs";
 import {assessProject} from "../lib/repo-quality.mjs";
+import {featuredOriginals,trackedOwners,consoleDiscoveryQueries} from "../lib/featured-repositories.mjs";
 const API="https://api.github.com";
 const BASE=process.env.SUPABASE_URL;
 const KEY=process.env.SUPABASE_SERVICE_KEY;
@@ -145,41 +146,80 @@ async function upsertBatch(part){
 async function upsert(rows){
  for(let i=0;i<rows.length;i+=12)await upsertBatch(rows.slice(i,i+12));
 }
-// Guaranteed hand-picked project entries, regardless of stars.
-// Keep this list intentionally small; it is not an account-wide bulk import.
-const featuredOriginals=[
- {fullName:"dnestruev/messenger",category:"tools",
-  homepage:"https://dnestruev.github.io/messenger/",
-  fallbackDescription:"Веб-мессенджер для обмена сообщениями"},
- {fullName:"Peteroxhka/repo-radar",category:"web",
-  homepage:"https://peteroxhka.github.io/repo-radar/",
-  fallbackDescription:"Каталог проектов GitHub с поиском, категориями и сообществом"},
- {fullName:"Akela-x/ps4freeforall",category:"console_webkit",
-  homepage:"https://akela-x.github.io/ps4freeforall/",
-  fallbackDescription:"PS4 WebKit — интерактивная страница проекта"}
-];
+// Curated upstream projects + public accounts. Never mutate existing catalog
+// rows: source metadata is checked against GitHub and IDs against Supabase.
 async function syncFeaturedOriginals(){
- const toSave=[];
+ const entries=[];let missingCount=0,qualitySkipped=0;
  for(const item of featuredOriginals){
-  const repo=await getJson(`${API}/repos/${item.fullName}`);
-  if(!repo.id||!repo.full_name||repo.full_name.toLowerCase()!==item.fullName.toLowerCase()||repo.fork||repo.archived||repo.private)
-   throw new Error(`Featured repository is unavailable or ineligible: ${item.fullName}`);
+  let repo;
+  try{repo=await getJson(`${API}/repos/${item.fullName}`);}
+  catch(error){
+   if(/GitHub search 404\b/.test(String(error.message))){
+    missingCount++;console.warn(`Missing or private GitHub repo: ${item.fullName}`);
+    continue;
+   }
+   throw error;
+  }
+  if(!repo?.id||repo.full_name?.toLowerCase()!==item.fullName.toLowerCase())throw Error(`Invalid seed metadata: ${item.fullName}`);
+  let qualityRepo=repo;
+  if(repo.size===0&&item.verifyFile){
+   // GitHub can report an outdated size immediately after repository creation.
+   // Check for a substantial real source file, not a README-only stub.
+   try{
+    const file=await getJson(`${API}/repos/${item.fullName}/contents/${item.verifyFile}`);
+    if(file.type==="file"&&Number(file.size)>=1000)
+     qualityRepo={...repo,size:Math.max(3,Math.ceil(file.size/1024))};
+   }catch(error){console.warn(`Source verification failed for ${item.fullName}: ${error.message}`);}
+  }
+  const verdict=assessProject(qualityRepo,{featured:true});
+  if(!verdict.eligible){qualitySkipped++;console.warn(`Seed excluded (${verdict.reason}): ${item.fullName}`);continue;}
   const entry=row(repo,item.category);
-  entry.homepage=item.homepage;
+  entry.category=item.category;
+  entry.homepage=item.homepage||entry.homepage;
   entry.description=repo.description||item.fallbackDescription;
-  toSave.push(entry);
+  entries.push(entry);
  }
- const existing=await knownInDatabase(toSave.map(entry=>entry.id));
- const missing=toSave.filter(entry=>!existing.has(entry.id));
- await upsert(missing);
- for(const entry of toSave)knownIds.add(entry.id);
- console.log(`Featured originals: ${missing.length} new, ${existing.size} existing (not overwritten)`);
+ const existing=await knownInDatabase(entries.map(x=>x.id));
+ const fresh=entries.filter(x=>!existing.has(x.id));
+ await upsert(fresh);
+ for(const entry of entries)knownIds.add(entry.id);
+ console.log(`Curated projects: ${fresh.length} new, ${existing.size} existing, ${missingCount} unavailable, ${qualitySkipped} excluded`);
+}
+async function syncTrackedOwners(){
+ for(const owner of trackedOwners){
+  const entries=[],observed=new Set();
+  for(let page=1;page<=3;page++){
+   const query=`user:${owner} fork:false archived:false`;
+   const url=`${API}/search/repositories?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=100&page=${page}`;
+   const response=await getJson(url),repos=response.items||[];
+   if(!Array.isArray(repos))throw Error("Invalid owner discovery response");
+   for(const repo of repos){
+    if(!Number.isSafeInteger(repo?.id)||observed.has(repo.id)||knownIds.has(repo.id))continue;
+    observed.add(repo.id);
+    if(String(repo.owner?.login||"").toLowerCase()!==owner.toLowerCase())continue;
+    const verdict=assessProject(repo);
+    if(!verdict.eligible){skip("owner-"+verdict.reason);continue;}
+    entries.push(row(repo,repo.language?"programming":"tools"));
+   }
+   if(repos.length<100)break;
+  }
+  const existing=await knownInDatabase(entries.map(x=>x.id));
+  const fresh=entries.filter(x=>!existing.has(x.id));
+  await upsert(fresh);
+  for(const entry of entries)knownIds.add(entry.id);
+  console.log(`Tracked @${owner}: ${fresh.length} new meaningful projects, ${existing.size} duplicates skipped`);
+ }
 }
 await syncFeaturedOriginals();
+await syncTrackedOwners();
+if(process.argv.includes("--featured-only")){
+ console.log("Curated projects and public owned repositories synchronized.");
+ process.exit(0);
+}
 
 const recent=discoverySlot();
 const sort=recent%3===0?"updated":"stars";
-const jobs=buildDiscoveryPlan(QUERIES,recent);
+const jobs=buildDiscoveryPlan([...QUERIES,...consoleDiscoveryQueries],recent);
 console.log(`Discovery plan: ${jobs.length} searches, ${jobs.filter(x=>x.track==="rotating").length} rotating topics, ${jobs.filter(x=>x.track==="deep").length} deeper pages, sorting by ${sort}`);
 let successful=0,failed=0,skippedInRun=0,skippedExisting=0,inserted=0;
 for(const {category,search,page,track} of jobs){

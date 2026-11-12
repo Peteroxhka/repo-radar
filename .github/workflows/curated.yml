@@ -1,0 +1,39 @@
+name: Sync reviewed GitHub projects
+on:
+  push:
+    branches: [main]
+    paths:
+      - "lib/featured-repositories.mjs"
+      - "lib/repo-quality.mjs"
+      - "scripts/collect.mjs"
+      - "tests/featured-repositories.test.mjs"
+      - ".github/workflows/curated.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repo-radar-reviewed-projects
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Validate featured GitHub catalog
+        run: |
+          node --check scripts/collect.mjs
+          node --check lib/featured-repositories.mjs
+          node --test tests/repo-quality.test.mjs tests/featured-repositories.test.mjs tests/collector-guard.test.mjs
+      - name: Import only new reviewed projects and owner repositories
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUPABASE_URL: https://tlqsmwsjeogudgijnpnu.supabase.co
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node scripts/collect.mjs --featured-only

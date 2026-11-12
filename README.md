@@ -30,6 +30,14 @@
 - Исключение форков и архивных репозиториев из публичной выдачи.
 - Выделение официального репозитория Repo Radar и прямые ссылки на исходники и сайт.
 
+### Источники GitHub и проекты авторов
+
+Помимо обычного поиска и ежечасного пополнения, Repo Radar поддерживает **проверенные GitHub-источники**, предоставленные владельцем сайта, включая подборку проектов для PS4, PS5 и Nintendo Switch. Также импортируются качественные публичные репозитории GitHub-аккаунтов `Peteroxhka` и `dnestruev` — даже без звёзд, если у них есть содержимое и описание.
+
+Сборщик перед добавлением сверяет **GitHub ID** с Supabase, исключает уже имеющиеся записи, форки, архивы, пустые проекты и заглушки. Существующие записи не перезаписываются. Отсутствующие GitHub-страницы (404) не выдаются за доступные проекты. Для новых отобранных ссылок есть отдельный быстрый workflow `Sync reviewed GitHub projects`; широкий поиск по дополнительным запросам продолжает работать по расписанию.
+
+Список источников: `lib/featured-repositories.mjs`; сборщик: `scripts/collect.mjs`; тесты: `tests/featured-repositories.test.mjs`.
+
 ### Консольные WebKit
 
 В отдельной категории собираются проекты, в метаданных которых одновременно упоминаются WebKit и конкретные игровые консоли. Доступны фильтры **консоль**, **версия проекта**, **версия прошивки** и **тип прошивки**; названия консолей отсортированы по алфавиту. Для PS4 предусмотрены семейства версий вплоть до `14.XX`.
@@ -162,6 +170,14 @@ Repo Radar is **not** a GitHub replacement and does not mirror third-party sourc
 - Programming-language filtering, paginated loading, and category counts.
 - Forks and archived projects excluded from normal public results.
 - A first-party Repo Radar feature block linking directly to the official code and website.
+
+### Reviewed GitHub sources and owner repositories
+
+In addition to broad hourly GitHub searches, Repo Radar supports a small set of **reviewed public repository names** submitted by its maintainer, including console-related PS4, PS5, and Nintendo Switch projects. It also discovers quality-filtered public projects from GitHub accounts `Peteroxhka` and `dnestruev`, including useful zero-star originals.
+
+Before inserting, the collector checks **GitHub repository IDs** against Supabase. It excludes duplicate, archived, forked, empty, and placeholder projects and does not overwrite existing entries. Missing GitHub URLs (404) are never presented as available. A separate workflow, `Sync reviewed GitHub projects`, imports reviewed additions without waiting for the broad scheduled search.
+
+Source manifest: `lib/featured-repositories.mjs`; importer: `scripts/collect.mjs`; tests: `tests/featured-repositories.test.mjs`.
 
 ### Console WebKit catalog
 
