@@ -8,17 +8,23 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: repo-radar-public-catalog
+  cancel-in-progress: false
+
 jobs:
   collect:
     runs-on: ubuntu-latest
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - name: Collect
+      - name: Collect public GitHub catalog
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SUPABASE_URL: https://tlqsmwsjeogudgijnpnu.supabase.co
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          MAX_PAGES_PER_RUN: "850"
         run: node scripts/collect.mjs
