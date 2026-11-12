@@ -16,3 +16,11 @@ as $$
 $$;
 revoke all on function repo_radar.list_repo_languages() from public;
 grant execute on function repo_radar.list_repo_languages() to anon, authenticated;
+
+drop policy if exists "No client access to collector state" on repo_radar.collector_state;
+create policy "No client access to collector state"
+on repo_radar.collector_state
+for all
+to anon, authenticated
+using (false)
+with check (false);
