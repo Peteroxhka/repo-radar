@@ -38,7 +38,7 @@
 
 ### Console Hub — определение консоли
 
-На главной странице есть отдельная кнопка **«Консольный центр»**, ведущая на [Console Hub](console-hub.html). Поддерживается определение браузеров PS3, PS4, PS5, PS Vita, Wii U, Nintendo Switch и Xbox, а также ручной выбор консоли на случай, если браузер скрывает модель.
+На главной странице есть отдельная кнопка **«Консольный центр»**, ведущая на [Console Hub](https://peteroxhka.github.io/ConsoleWebKit/). Поддерживается определение браузеров PS3, PS4, PS5, PS Vita, Wii U, Nintendo Switch и Xbox, а также ручной выбор консоли на случай, если браузер скрывает модель.
 
 - Автоматическая проверка читает только `navigator.userAgent`. Некоторые версии PS4 и PS5 сообщают предполагаемую прошивку в этой строке.
 - Если прошивка не обнаружена, её можно указать вручную. **Ни автоматический, ни ручной ввод не гарантируют фактической совместимости стороннего проекта.**
@@ -171,7 +171,7 @@ The dedicated Console WebKit category groups repositories whose published metada
 
 ### Console Hub — platform and firmware hints
 
-The homepage has a dedicated **[Console Hub](console-hub.html)** button. It supports conservative browser identification and manual console selection for PS3, PS4, PS5, PS Vita, Wii U, Nintendo Switch, and Xbox.
+The homepage has a dedicated **[Console Hub](https://peteroxhka.github.io/ConsoleWebKit/)** button. It supports conservative browser identification and manual console selection for PS3, PS4, PS5, PS Vita, Wii U, Nintendo Switch, and Xbox.
 
 - Automatic identification inspects only `navigator.userAgent`; some PS4/PS5 browsers include a **firmware hint** in this value.
 - Visitors can manually select a platform and provide a firmware number when automatic identification fails. **Neither a user-agent hint nor a manually entered version proves actual project compatibility.**
