@@ -28,8 +28,13 @@ jobs:
           node --check lib/core.mjs
           node --check lib/catalog.mjs
           node --check lib/console-filters.mjs
+          node --check lib/readme-previews.mjs
+          node --check scripts/stamp-build.mjs
+          node --check unsupported-browser.js
           node --check scripts/collect.mjs
           node --test tests/*.test.mjs
+      - name: Stamp build revision into static assets
+        run: node scripts/stamp-build.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

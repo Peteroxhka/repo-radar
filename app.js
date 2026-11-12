@@ -1,10 +1,19 @@
 import {normalizeSearch, mergeMessages, isCurrentChat, dmConversationFilter, attachmentMime} from "./lib/core.mjs";
 import {createClient} from "https://esm.sh/@supabase/supabase-js@2.57.0";
 import {trustedGitHubPagesSite} from "./lib/catalog.mjs";
+import {readmeScreenshots} from "./lib/readme-previews.mjs";
 import {consoleMetadata,filterConsoleProjects,sortConsoleProjects,consoleFacetOptions} from "./lib/console-filters.mjs";
 import {SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, DATABASE_SCHEMA} from "./config.js";
 const sb=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{db:{schema:DATABASE_SCHEMA},auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const $=id=>document.getElementById(id);
+function generateUUID(){
+ if(typeof crypto.randomUUID==="function")return generateUUID();
+ // iOS / Android browsers predating crypto.randomUUID still support secure RNG.
+ const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
+ bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
+ const h=Array.from(bytes,x=>x.toString(16).padStart(2,"0")).join("");
+ return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+}
 const translations={
 ru:{discover:"Обзор",messages:"Сообщения",darkTheme:"Тёмная",lightTheme:"Светлая",cosmicTheme:"Космос",loadMore:"Показать ещё",signIn:"Войти",eyebrow:"ОТКРЫТЫЙ КОД. НОВЫЕ ИДЕИ.",headline:"Находи свой следующий <em>любимый проект.</em>",tagline:"Лучшие открытые репозитории GitHub в одной красивой ленте. Обновление каждые шесть часов.",explore:"Исследовать проекты",projects:"проектов",trending:"Проекты, достойные внимания",search:"Поиск",allLanguages:"Все языки",language:"Язык программирования",loading:"Загружаем проекты...",community:"СООБЩЕСТВО",yourMessages:"Личные сообщения",messagesIntro:"Общайся и делись файлами. Без звонков.",joinConversation:"Присоединяйся к общению",loginToChat:"Войди или зарегистрируйся, чтобы писать другим пользователям.",conversations:"Диалоги",findUser:"Найти пользователя",startChat:"Начать диалог",chooseChat:"Выбери собеседника",send:"Отправить",attachmentLimit:"Вложения до 25 МБ, без исполняемых файлов.",welcomeBack:"Добро пожаловать",authIntro:"Сохраняй профиль и общайся с разработчиками.",continueGithub:"Продолжить с GitHub",orEmail:"или по электронной почте",username:"Имя пользователя",password:"Пароль",needAccount:"Нет аккаунта? Зарегистрироваться",alreadyAccount:"Уже есть аккаунт? Войти",register:"Зарегистрироваться",account:"АККАУНТ",yourProfile:"Твой профиль",uploadAvatar:"Загрузить фото профиля (до 5 МБ)",githubAvatarHint:"Для GitHub-аккаунта изображение меняется в настройках GitHub.",saveChanges:"Сохранить",signOut:"Выйти",footerNote:"Независимый каталог открытого кода",noProjects:"Ничего не найдено",noDescription:"Без описания",all:"Все",programming:"Код",tools:"Инструменты",ai:"ИИ",data:"Данные",web:"Веб",learning:"Обучение",games:"Игры",repoSearch:"Поиск по проектам...",userSearch:"Никнейм пользователя...",messagePlaceholder:"Написать сообщение...",noChat:"Пока нет диалогов",userNotFound:"Пользователь не найден",sameUser:"Нельзя начать диалог с собой",fileReady:"Файл выбран",fileTooLarge:"Файл превышает лимит 25 МБ",unsupportedFile:"Этот тип файла недоступен для загрузки",emailVerify:"Проверь почту для подтверждения регистрации",saved:"Сохранено",busy:"Загрузка...",error:"Ошибка",configNeeded:"Нужна настройка базы по инструкции README",previewOnly:"Для отправки сообщений настрой базу Supabase",githubUser:"Аккаунт GitHub",emailUser:"Email-аккаунт"},
 en:{discover:"Discover",messages:"Messages",darkTheme:"Dark",lightTheme:"Light",cosmicTheme:"Cosmic",loadMore:"Load more",signIn:"Sign in",eyebrow:"OPEN SOURCE. NEW IDEAS.",headline:"Find your next <em>favorite project.</em>",tagline:"Explore standout open-source repositories from GitHub. Refreshed every six hours.",explore:"Explore projects",projects:"projects",trending:"Projects worth exploring",search:"Search",allLanguages:"All languages",language:"Programming language",loading:"Loading repositories...",community:"COMMUNITY",yourMessages:"Direct messages",messagesIntro:"Chat and share files. No calls.",joinConversation:"Join the conversation",loginToChat:"Sign in or sign up to message other users.",conversations:"Conversations",findUser:"Find a user",startChat:"Start chat",chooseChat:"Choose a conversation",send:"Send",attachmentLimit:"Attachments up to 25 MB; executable files are blocked.",welcomeBack:"Welcome back",authIntro:"Create your profile and connect with developers.",continueGithub:"Continue with GitHub",orEmail:"or with email",username:"Username",password:"Password",needAccount:"No account? Sign up",alreadyAccount:"Already registered? Sign in",register:"Sign up",account:"ACCOUNT",yourProfile:"Your profile",uploadAvatar:"Upload avatar (up to 5 MB)",githubAvatarHint:"GitHub users change their avatar in GitHub settings.",saveChanges:"Save changes",signOut:"Sign out",footerNote:"Independent open-source discovery",noProjects:"No projects found",noDescription:"No description",all:"All",programming:"Code",tools:"Tools",ai:"AI",data:"Data",web:"Web",learning:"Learning",games:"Games",repoSearch:"Search repositories...",userSearch:"Username...",messagePlaceholder:"Write a message...",noChat:"No conversations yet",userNotFound:"User not found",sameUser:"You can't chat with yourself",fileReady:"File selected",fileTooLarge:"File exceeds 25 MB",unsupportedFile:"This file type is not allowed",emailVerify:"Check your email to confirm your registration",saved:"Saved",busy:"Loading...",error:"Error",configNeeded:"Configure Supabase using the README",previewOnly:"Configure Supabase to send messages",githubUser:"GitHub account",emailUser:"Email account"},
@@ -42,6 +51,32 @@ Object.assign(translations.ru,{
  anyConsole:"Все консоли",anyVersion:"Любая версия проекта",anyFirmwareVersion:"Любая версия прошивки",
  anyFirmwareType:"Любой тип прошивки",unspecified:"Не указано"
 });
+Object.assign(translations.en,{
+ adminPanel:"Admin",adminIntro:"Catalog health and reversible moderation. Restricted to the verified site owner.",
+ adminCatalog:"Manage repositories",adminCatalogHint:"Search repositories and hide unsuitable catalog entries. You can restore any project.",
+ adminSearch:"Find repository",adminFind:"Search",adminHide:"Hide",adminRestore:"Restore",
+ adminHidden:"Hidden",adminVisible:"Visible",adminSaved:"Catalog visibility updated.",
+ adminSafety:"This panel controls catalog visibility only — not accounts, private conversations or database settings.",
+ adminSummaryTotal:"Indexed repositories",adminSummaryVisible:"Visible projects",adminSummaryHidden:"Hidden projects",
+ adminSummaryWebkit:"Console WebKit",adminSummaryUsers:"Registered users",adminSummaryMessages:"Messages",
+ repoDetails:"Project details",viewDetails:"View details",sourceCode:"Source on GitHub",projectAuthor:"Author",
+ projectScreenshots:"Screenshots from GitHub",screenshotsLoading:"Checking GitHub README for screenshots...",
+ screenshotsNone:"No screenshots found in the project README.",screenshotsUnavailable:"Screenshots are temporarily unavailable.",
+ refreshLatest:"Load latest version"
+});
+Object.assign(translations.ru,{
+ adminPanel:"Админка",adminIntro:"Состояние каталога и обратимая модерация. Только для подтверждённого владельца сайта.",
+ adminCatalog:"Управление репозиториями",adminCatalogHint:"Находи проекты и скрывай неподходящие записи. Любой проект можно восстановить.",
+ adminSearch:"Найти репозиторий",adminFind:"Поиск",adminHide:"Скрыть",adminRestore:"Восстановить",
+ adminHidden:"Скрыт",adminVisible:"Виден",adminSaved:"Видимость проекта обновлена.",
+ adminSafety:"Админка управляет только каталогом — не аккаунтами, личными сообщениями или настройками базы.",
+ adminSummaryTotal:"Репозиториев в базе",adminSummaryVisible:"Видимых проектов",adminSummaryHidden:"Скрытых проектов",
+ adminSummaryWebkit:"Консольные WebKit",adminSummaryUsers:"Пользователей",adminSummaryMessages:"Сообщений",
+ repoDetails:"О проекте",viewDetails:"Подробнее",sourceCode:"Исходники на GitHub",projectAuthor:"Автор",
+ projectScreenshots:"Скриншоты из GitHub",screenshotsLoading:"Ищем скриншоты в GitHub README...",
+ screenshotsNone:"В README нет скриншотов.",screenshotsUnavailable:"Не удалось загрузить скриншоты.",
+ refreshLatest:"Загрузить новую версию"
+});
 const categoryKeys=["all","programming","tools","ai","data","web","learning","games","console_webkit","other"];
 const localeNames={ru:"Русский",en:"English",es:"Español",fr:"Français",de:"Deutsch",pt:"Português",zh:"中文",ja:"日本語",ko:"한국어",ar:"العربية",hi:"हिन्दी",tr:"Türkçe"};
 const allowedExt=new Set(["jpg","jpeg","png","webp","gif","bmp","heic","mp4","webm","mov","m4v","mp3","ogg","wav","m4a","aac","flac","pdf","txt","md","csv","json","doc","docx","xls","xlsx","ppt","pptx","odt","ods","odp","zip","7z","rar"]);
@@ -50,7 +85,8 @@ const blockedMime=/x-msdownload|x-executable|x-sh|x-bat|x-dosexec|javascript|tex
 let locale=localStorage.getItem("radar-locale")||"en";
 if(!translations[locale])locale="en";
 let theme=localStorage.getItem("radar-theme")||"dark";if(!["dark","light","cosmic"].includes(theme))theme="dark";
-let state={chatEpoch:0,messageBusy:false,historyCursor:null,historyMore:false,contactRequest:0,category:"all",language:"",search:"",sort:"popular",includeDescription:false,consoleFilters:{console:"",version:"",firmwareVersion:"",firmwareType:""},consoleRows:null,user:null,profile:null,peer:null,allRows:[],totalCount:0,catalogTotal:0,categoryCounts:{},categoryCountsLoaded:false,hasMore:true,loading:false,languageOptions:[],languageOptionsLoaded:false,listRequestId:0,searchTimer:null,seen:new Map(),sub:null,refreshTimer:null,register:false};
+let state={chatEpoch:0,messageBusy:false,historyCursor:null,historyMore:false,contactRequest:0,category:"all",language:"",search:"",sort:"popular",includeDescription:false,consoleFilters:{console:"",version:"",firmwareVersion:"",firmwareType:""},consoleRows:null,user:null,profile:null,peer:null,allRows:[],totalCount:0,catalogTotal:0,categoryCounts:{},categoryCountsLoaded:false,hasMore:true,loading:false,languageOptions:[],languageOptionsLoaded:false,listRequestId:0,searchTimer:null,seen:new Map(),sub:null,refreshTimer:null,register:false,adminAuthorized:false};
+let adminAccessEpoch=0,detailRequestEpoch=0;
 Object.assign(translations.ru,{sort:"Сортировка",sortPopular:"Самые популярные ★",sortLeast:"Меньше звёзд",sortRecent:"Недавно обновлённые",sortNewest:"Новые проекты",sortForked:"Чаще копируют",searchDescription:"Искать также в описаниях",ps4Website:"Открыть сайт"});
 Object.assign(translations.en,{sort:"Sort",sortPopular:"Most starred ★",sortLeast:"Least starred",sortRecent:"Recently updated",sortNewest:"Newest repositories",sortForked:"Most forked",searchDescription:"Also search descriptions",ps4Website:"Open website"});
 const categoryLabels={ru:"Без категории",en:"Unclassified",es:"Sin categoría",fr:"Sans catégorie",de:"Nicht kategorisiert",pt:"Sem categoria",zh:"未分类",ja:"未分類",ko:"미분류",ar:"غير مصنف",hi:"अवर्गीकृत",tr:"Kategorisiz"};
@@ -100,7 +136,7 @@ async function fetchConsoleRows(){
    const rows=[],batch=500;
    for(let start=0;;start+=batch){
     const {data,error}=await sb.from("repos").select("id,name,owner_login,full_name,description,html_url,language,topics,stars,license_spdx,category,pushed_at,created_at,forks_count,homepage")
-     .eq("category","console_webkit").eq("is_fork",false).eq("is_archived",false).order("id").range(start,start+batch-1);
+     .eq("category","console_webkit").eq("is_fork",false).eq("is_archived",false).eq("admin_hidden",false).order("id").range(start,start+batch-1);
     if(error)throw error;
     rows.push(...(data||[]));
     if(!data||data.length<batch)break;
@@ -152,7 +188,79 @@ if(r.full_name?.toLowerCase()==="peteroxhka/repo-radar"){const badge=document.cr
 card.append(title,descWrap,meta);
 const projectSite=trustedGitHubPagesSite(r.site_url)||featuredSiteLinks[r.full_name?.toLowerCase()];
 if(projectSite){const site=document.createElement("a");site.className="project-site-link";site.href=projectSite;site.target="_blank";site.rel="noopener noreferrer";site.textContent=t("visitSite");card.append(site);}
+const details=document.createElement("button");
+details.className="project-details-button";details.type="button";details.textContent=t("viewDetails");
+details.onclick=()=>openProjectDetails(r);
+card.append(details);
+card.tabIndex=0;card.setAttribute("role","group");
+card.setAttribute("aria-label",`${r.name}: ${t("viewDetails")}`);
+card.onclick=e=>{if(e.target.closest?.("a,button"))return;openProjectDetails(r);};
+card.onkeydown=e=>{if(e.target===card&&(e.key==="Enter"||e.key===" ")){e.preventDefault();openProjectDetails(r);}};
 frag.append(card);} $("grid").replaceChildren(frag);}
+
+// Rich project preview. Only README images served from GitHub are displayed;
+// GitHub API rate limits and absent screenshots are handled gracefully.
+async function openProjectDetails(repo){
+ const uid=++detailRequestEpoch;
+ const source=String(repo.html_url||"");
+ const fullname=String(repo.full_name||"");
+ const parts=fullname.split("/");
+ const canFetch=parts.length===2&&parts.every(p=>/^[a-zA-Z0-9_.-]+$/.test(p));
+ const sourceUrl=canFetch?`https://github.com/${parts.map(encodeURIComponent).join("/")}`:null;
+ const title=$("repo-detail-title");
+ const titleLink=document.createElement("a");
+ titleLink.textContent=repo.name||fullname;
+ if(sourceUrl){titleLink.href=sourceUrl;titleLink.target="_blank";titleLink.rel="noopener noreferrer";}
+ title.replaceChildren(titleLink);
+ const desc=String(repo.description||t("noDescription")).trim();
+ $("repo-detail-description").textContent=Array.from(desc).slice(0,950).join("")+(Array.from(desc).length>950?"…":"");
+ const info=[repo.language,repo.category,`★ ${number(repo.stars)}`].filter(Boolean);
+ const detailTags=info.map(value=>{const tag=document.createElement("span");tag.className="repo-tag";tag.textContent=value;return tag;});
+ $("repo-detail-tags").replaceChildren(...detailTags);
+ const sourceEl=$("repo-source-link");
+ if(sourceUrl){sourceEl.href=sourceUrl;sourceEl.classList.remove("hidden");}
+ else{sourceEl.removeAttribute("href");sourceEl.classList.add("hidden");}
+ const ownerEl=$("repo-owner-link");
+ if(canFetch){ownerEl.href=`https://github.com/${encodeURIComponent(parts[0])}`;ownerEl.classList.remove("hidden");}
+ else{ownerEl.removeAttribute("href");ownerEl.classList.add("hidden");}
+ const live=trustedGitHubPagesSite(repo.site_url||repo.homepage)||featuredSiteLinks[fullname.toLowerCase()];
+ const liveEl=$("repo-live-link");
+ if(live){liveEl.href=live;liveEl.classList.remove("hidden");}
+ else{liveEl.removeAttribute("href");liveEl.classList.add("hidden");}
+ $("repo-images").replaceChildren();
+ setStatus("repo-images-status",t("screenshotsLoading"));
+ openDialog("repo-dialog");
+ if(!canFetch){setStatus("repo-images-status",t("screenshotsNone"));return;}
+ try{
+  const res=await fetch(`https://api.github.com/repos/${encodeURIComponent(parts[0])}/${encodeURIComponent(parts[1])}/readme`,{
+   headers:{Accept:"application/vnd.github+json"}
+  });
+  if(uid!==detailRequestEpoch||!$("repo-dialog").open)return;
+  if(res.status===404){setStatus("repo-images-status",t("screenshotsNone"));return;}
+  if(!res.ok)throw Error("GitHub README "+res.status);
+  const data=await res.json();
+  const encoded=String(data.content||"").replace(/\s/g,"");
+  if(!encoded||encoded.length>1_400_000)throw Error("README not available for preview");
+  const binary=atob(encoded);
+  const bytes=Uint8Array.from(binary,char=>char.charCodeAt(0));
+  const md=new TextDecoder("utf-8").decode(bytes);
+  const imgs=readmeScreenshots(md,data.download_url);
+  if(uid!==detailRequestEpoch||!$("repo-dialog").open)return;
+  if(!imgs.length){setStatus("repo-images-status",t("screenshotsNone"));return;}
+  const gallery=imgs.map(item=>{
+   const link=document.createElement("a");link.href=item.src;link.target="_blank";link.rel="noopener noreferrer";
+   const img=document.createElement("img");img.src=item.src;img.alt=item.alt;
+   img.loading="lazy";img.decoding="async";img.referrerPolicy="no-referrer";
+   link.append(img);return link;
+  });
+  $("repo-images").replaceChildren(...gallery);
+  setStatus("repo-images-status","");
+ }catch(e){
+  console.warn("README preview:",e.message);
+  if(uid===detailRequestEpoch&&$("repo-dialog").open)setStatus("repo-images-status",t("screenshotsUnavailable"));
+ }
+}
+
 async function loadRepos(reset=true){
 if(!reset&&(state.loading||!state.hasMore))return;
 const requestId=++state.listRequestId;
@@ -236,11 +344,107 @@ if(!$("view-discover").classList.contains("hidden")&&entries.some(entry=>entry.i
 catalogObserver.observe($("load-more-sentinel"));
 }
 function showTab(tab){
-for(const name of ["discover","messages"]){$("view-"+name).classList.toggle("hidden",tab!==name);$("tab-"+name).classList.toggle("active",tab===name);}
-if(tab==="messages"&&state.user)loadContacts();
+ if(tab==="admin"&&!state.adminAuthorized)return;
+ for(const name of ["discover","messages","admin"]){
+  $("view-"+name).classList.toggle("hidden",tab!==name);
+  $("tab-"+name).classList.toggle("active",tab===name);
+  $("tab-"+name).setAttribute("aria-current",tab===name?"page":"false");
+ }
+ if(tab==="messages"&&state.user)loadContacts();
+ if(tab==="admin")loadAdminDashboard();
+ if(tab==="discover")loadRepos(true);
 }
-$("tab-discover").onclick=()=>showTab("discover");$("tab-messages").onclick=()=>showTab("messages");
-function openDialog(id){if(!$(id).open)$(id).showModal();}document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.close).close());
+$("tab-discover").onclick=()=>showTab("discover");
+$("tab-messages").onclick=()=>showTab("messages");
+$("tab-admin").onclick=()=>showTab("admin");
+$("reload-latest").onclick=()=>{
+ const url=new URL(location.href);
+ url.searchParams.set("latest",Date.now().toString(36));
+ location.assign(url.href);
+};
+function openDialog(id){
+ const d=$(id);if(d.open)return;
+ if(typeof d.showModal==="function")d.showModal();
+ else{d.setAttribute("open","");d.classList.add("legacy-dialog-open");}
+}
+function closeDialog(id){
+ const d=$(id);if(!d)return;
+ if(typeof d.close==="function"&&d.open)d.close();
+ else{d.removeAttribute("open");d.classList.remove("legacy-dialog-open");}
+ if(id==="repo-dialog")detailRequestEpoch++;
+}
+document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>closeDialog(b.dataset.close));
+$("repo-dialog").addEventListener("close",()=>{detailRequestEpoch++;});
+
+// Protected admin RPCs run on Supabase with an immutable, verified GitHub identity.
+// Never trust a username, button visibility or data from the browser for authorization.
+async function checkAdminAccess(userId){
+ const epoch=++adminAccessEpoch;
+ let allowed=false;
+ try{
+  const {data,error}=await sb.rpc("admin_is_authorized");
+  if(error)throw error;
+  allowed=data===true;
+ }catch(e){console.warn("Admin authorization unavailable:",e.message);}
+ if(epoch!==adminAccessEpoch||state.user?.id!==userId)return;
+ state.adminAuthorized=allowed;
+ $("tab-admin").classList.toggle("hidden",!allowed);
+ if(!allowed&&!$("view-admin").classList.contains("hidden"))showTab("discover");
+}
+async function loadAdminDashboard(){
+ if(!state.adminAuthorized||!state.user)return;
+ setStatus("admin-status",t("loading"));
+ const [sum,listing]=await Promise.all([sb.rpc("admin_dashboard"),sb.rpc("admin_find_repos",{search_text:"",max_results:20})]);
+ if(!state.adminAuthorized)return;
+ if(sum.error||listing.error){setStatus("admin-status",safeErr(sum.error||listing.error),true);return;}
+ const data=sum.data?.[0]||{};
+ const metrics=[
+ ["adminSummaryTotal","total_repos"],["adminSummaryVisible","visible_repos"],
+ ["adminSummaryHidden","hidden_repos"],["adminSummaryWebkit","console_webkits"],
+ ["adminSummaryUsers","profiles_count"],["adminSummaryMessages","messages_count"]
+ ];
+ const cards=metrics.map(([label,key])=>{
+  const box=document.createElement("div");box.className="admin-stat";
+  const title=document.createElement("span");title.textContent=t(label);
+  const number=document.createElement("strong");number.textContent=Number(data[key]??0).toLocaleString(locale);
+  box.append(title,number);return box;
+ });
+ $("admin-stats").replaceChildren(...cards);
+ renderAdminRepoResults(listing.data||[]);
+ setStatus("admin-status","");
+}
+function renderAdminRepoResults(rows){
+ const items=rows.map(r=>{
+  const wrapper=document.createElement("div");wrapper.className="admin-repo-row";
+  const info=document.createElement("div");info.className="admin-repo-info";
+  const name=document.createElement("strong");name.textContent=r.full_name;
+  const meta=document.createElement("span");meta.textContent=`${r.category} · ★ ${number(r.stars)} · ${t(r.admin_hidden?"adminHidden":"adminVisible")}`;
+  info.append(name,meta);
+  const action=document.createElement("button");action.type="button";
+  action.className="button "+(r.admin_hidden?"button-primary":"button-outline");
+  action.textContent=t(r.admin_hidden?"adminRestore":"adminHide");
+  action.onclick=async()=>{
+   action.disabled=true;
+   const {data,error}=await sb.rpc("admin_set_repo_hidden",{repo_id:r.id,hidden:!r.admin_hidden,note:"Catalog moderation"});
+   if(error||!data){setStatus("admin-status",safeErr(error||Error("Project not found")),true);action.disabled=false;return;}
+   state.categoryCountsLoaded=false;state.consoleRows=null;consoleCachePromise=null;
+   setStatus("admin-status",t("adminSaved"));
+   await loadAdminDashboard();
+  };
+  wrapper.append(info,action);return wrapper;
+ });
+ if(!items.length){const empty=document.createElement("p");empty.className="hint";empty.textContent=t("noProjects");items.push(empty);}
+ $("admin-project-list").replaceChildren(...items);
+}
+$("admin-search-form").onsubmit=async e=>{
+ e.preventDefault();if(!state.adminAuthorized)return;
+ setStatus("admin-status",t("loading"));
+ const query=$("admin-project-search").value.trim();
+ const {data,error}=await sb.rpc("admin_find_repos",{search_text:query,max_results:40});
+ if(error){setStatus("admin-status",safeErr(error),true);return;}
+ renderAdminRepoResults(data||[]);setStatus("admin-status","");
+};
+
 // OAuth provider failures are returned through query/hash parameters. Display
 // the explanation instead of silently landing on an unauthenticated home page.
 function reportOAuthRedirectError(){
@@ -262,7 +466,7 @@ try{if(state.register){const username=$("auth-username").value.trim().toLowerCas
 const{data,error}=await sb.auth.signUp({email,password,options:{data:{username},emailRedirectTo:new URL("./",location.href).href}});if(error)throw error;
 if(!data.session){setStatus("auth-status",t("emailVerify"));return;}}
 else{const{error}=await sb.auth.signInWithPassword({email,password});if(error)throw error;}
-$("auth-dialog").close();$("auth-form").reset();setStatus("auth-status","");
+closeDialog("auth-dialog");$("auth-form").reset();setStatus("auth-status","");
 }catch(err){setStatus("auth-status",safeErr(err),true);}finally{submit.disabled=false;}};
 function avatar(el,url,fallback){el.replaceChildren();if(url){try{const u=new URL(url);if(u.protocol==="https:"){const img=document.createElement("img");img.src=u.href;img.alt="";img.onerror=()=>{el.textContent=fallback?.charAt(0).toUpperCase()||"R";};el.append(img);return;}}catch{}}el.textContent=fallback?.charAt(0).toUpperCase()||"R";}
 function githubAccount(){return state.user?.app_metadata?.provider==="github"||state.user?.app_metadata?.providers?.includes("github");}
@@ -279,13 +483,20 @@ $("profile-open").onclick=()=>{setStatus("profile-status","");openDialog("profil
 $("profile-form").onsubmit=async e=>{e.preventDefault();if(!state.user||!state.profile)return;const button=$("profile-form").querySelector('button[type="submit"]');button.disabled=true;setStatus("profile-status",t("busy"));try{
 const name=$("profile-username").value.trim().toLowerCase();if(!/^[a-z0-9_]{3,24}$/.test(name))throw Error("Use 3–24 Latin letters, numbers, or _");
 let image=state.profile.avatar_url;const file=$("avatar-file").files[0];
-if(file&&!githubAccount()){if(file.size>5*1024*1024||!["image/jpeg","image/png","image/webp","image/gif"].includes(file.type))throw Error(t("unsupportedFile"));const ext=file.type.split("/")[1]==="jpeg"?"jpg":file.type.split("/")[1];const path=state.user.id+"/"+crypto.randomUUID()+"."+ext;const {error:upErr}=await sb.storage.from("repo-radar-avatars").upload(path,file,{contentType:file.type,upsert:false});if(upErr)throw upErr;const{data}=sb.storage.from("repo-radar-avatars").getPublicUrl(path);image=data.publicUrl;}
+if(file&&!githubAccount()){if(file.size>5*1024*1024||!["image/jpeg","image/png","image/webp","image/gif"].includes(file.type))throw Error(t("unsupportedFile"));const ext=file.type.split("/")[1]==="jpeg"?"jpg":file.type.split("/")[1];const path=state.user.id+"/"+generateUUID()+"."+ext;const {error:upErr}=await sb.storage.from("repo-radar-avatars").upload(path,file,{contentType:file.type,upsert:false});if(upErr)throw upErr;const{data}=sb.storage.from("repo-radar-avatars").getPublicUrl(path);image=data.publicUrl;}
 const{error}=await sb.from("profiles").update({username:name,avatar_url:image}).eq("id",state.user.id);if(error)throw error;await fetchProfile();$("avatar-file").value="";setStatus("profile-status",t("saved"));}catch(err){setStatus("profile-status",safeErr(err),true);}finally{button.disabled=false;}};
-$("signout").onclick=async()=>{const{error}=await sb.auth.signOut();if(error){setStatus("profile-status",safeErr(error),true);return;}$("profile-dialog").close();};
+$("signout").onclick=async()=>{const{error}=await sb.auth.signOut();if(error){setStatus("profile-status",safeErr(error),true);return;}closeDialog("profile-dialog");};
 function stopChat(){setStatus("chat-status","");$("file-input").disabled=true;state.chatEpoch+=1;state.contactRequest+=1;state.messageBusy=false;state.historyCursor=null;state.historyMore=false;$("chat-history").hidden=true;$("message-input").value="";$("file-input").value="";setStatus("file-preview","");delete $("chat-messages").dataset.lastId;if(state.sub){sb.removeChannel(state.sub);state.sub=null;}if(state.refreshTimer){clearInterval(state.refreshTimer);state.refreshTimer=null;}state.peer=null;state.seen.clear();$("chat-messages").replaceChildren();$("conversation-list").replaceChildren();$("chat-partner").textContent=t("chooseChat");$("message-input").disabled=true;$("message-send").disabled=true;}
 async function onSession(){const{data:{user}}=await sb.auth.getUser();const previous=state.user?.id;state.user=user||null;if(previous&&previous!==user?.id)stopChat();if(!user)stopChat();
 $("auth-open").classList.toggle("hidden",!!user);$("profile-open").classList.toggle("hidden",!user);$("chat-guest").classList.toggle("hidden",!!user);$("chat-app").classList.toggle("hidden",!user);
-if(user){await fetchProfile();if(!$("view-messages").classList.contains("hidden"))await loadContacts();}}
+if(user){
+ await fetchProfile();
+ await checkAdminAccess(user.id);
+ if(!$("view-messages").classList.contains("hidden"))await loadContacts();
+}else{
+ adminAccessEpoch+=1;state.adminAuthorized=false;$("tab-admin").classList.add("hidden");
+ if(!$("view-admin").classList.contains("hidden"))showTab("discover");
+}}
 sb.auth.onAuthStateChange(()=>{setTimeout(()=>onSession().catch(e=>console.error(e)),0);});
 async function findUsersById(ids){if(!ids.length)return new Map();const{data,error}=await sb.from("profiles").select("id,username,avatar_url").in("id",ids);if(error)throw error;return new Map((data||[]).map(u=>[u.id,u]));}
 async function loadContacts(){
@@ -306,7 +517,7 @@ let q=sb.from("direct_messages").select("id,sender_id,recipient_id").or("sender_
 if(cursor)q=q.gt("id",cursor);
 const result=await q;if(!current())return;if(result.error)throw result.error;
 for(const m of result.data||[])unique.add(m.sender_id===userId?m.recipient_id:m.sender_id);
-if((result.data||[]).length<500)break;cursor=result.data.at(-1).id;
+if((result.data||[]).length<500)break;cursor=result.data.slice(-1)[0].id;
 }ids.push(...unique);break;
 }
 ids.push(...(data||[]).map(row=>row.peer_id));if((data||[]).length<100)break;offset+=100;
@@ -334,19 +545,19 @@ if(!userId||!peerId||state.messageBusy||(older&&!state.historyMore))return;
 const current=()=>isCurrentChat(state,epoch,userId,peerId);state.messageBusy=true;$("chat-history").disabled=true;
 try{
 const first=state.seen.size===0;
-const latest=!first?Array.from(state.seen.values()).at(-1):null;
+const latest=!first?Array.from(state.seen.values()).slice(-1)[0]:null;
 const before=older?state.historyCursor:null;
 let q=sb.from("direct_messages").select("id,sender_id,recipient_id,content,file_path,file_name,file_type,file_size,created_at").or(dmConversationFilter(userId,peerId,older?null:latest,before)).order("created_at",{ascending:false}).order("id",{ascending:false});
 const {data,error}=await q.limit(100);if(!current())return;if(error)throw error;
 let page=data||[];
 // Catch up all unseen messages after a suspended tab, without gaps over 100 rows.
 if(!older&&!first&&page.length===100){
-let tail=page.at(-1);
+let tail=page.slice(-1)[0];
 while(true){
 const {data:batch,error:batchError}=await sb.from("direct_messages").select("id,sender_id,recipient_id,content,file_path,file_name,file_type,file_size,created_at").or(dmConversationFilter(userId,peerId,latest,tail)).order("created_at",{ascending:false}).order("id",{ascending:false}).limit(100);
-if(!current())return;if(batchError)throw batchError;page.push(...(batch||[]));if((batch||[]).length<100)break;tail=batch.at(-1);
+if(!current())return;if(batchError)throw batchError;page.push(...(batch||[]));if((batch||[]).length<100)break;tail=batch.slice(-1)[0];
 }}
-if(first||older){state.historyCursor=page.at(-1)||state.historyCursor;state.historyMore=page.length===100;}
+if(first||older){state.historyCursor=page.slice(-1)[0]||state.historyCursor;state.historyMore=page.length===100;}
 const messages=mergeMessages(Array.from(state.seen.values()),page);state.seen=new Map(messages.map(m=>[m.id,m]));
 const box=$("chat-messages"),height=box.scrollHeight,top=box.scrollTop,nearBottom=height-top-box.clientHeight<100;
 const frag=document.createDocumentFragment();
@@ -366,7 +577,7 @@ $("message-form").onsubmit=async e=>{e.preventDefault();const peer=state.peer,us
 let file_path=null,file_name=null,file_type=null,file_size=null;
 if(file){if(file.size>25*1024*1024)throw Error(t("fileTooLarge"));const ext=file.name.split(".").pop()?.toLowerCase();if(!allowedExt.has(ext)||blockedMime.test(file.type||""))throw Error(t("unsupportedFile"));
 file_name=file.name.slice(0,180);file_type=attachmentMime(file.name,file.type);if(!file_type)throw Error(t("unsupportedFile"));file_size=file.size;
-file_path=user.id+"/"+peer.id+"/"+crypto.randomUUID()+"."+ext;const{error:uploadError}=await sb.storage.from("repo-radar-dm").upload(file_path,file,{contentType:file_type,upsert:false});if(uploadError)throw uploadError;}
+file_path=user.id+"/"+peer.id+"/"+generateUUID()+"."+ext;const{error:uploadError}=await sb.storage.from("repo-radar-dm").upload(file_path,file,{contentType:file_type,upsert:false});if(uploadError)throw uploadError;}
 const {error}=await sb.from("direct_messages").insert({sender_id:user.id,recipient_id:peer.id,content:message,file_path,file_name,file_type,file_size});
 if(error){if(file_path){const cleanup=await sb.storage.from("repo-radar-dm").remove([file_path]);if(cleanup.error||!cleanup.data?.length)throw Error(t("cleanupFailed"));}throw error;}
 if(!current())return;setStatus("chat-status","");

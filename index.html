@@ -2,21 +2,33 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="apple-mobile-web-app-title" content="Repo Radar">
   <meta name="theme-color" content="#0a1020">
-  <meta name="description" content="Repo Radar — открытые проекты GitHub, профили и сообщения.">
+  <meta name="description" content="Repo Radar — discover open-source GitHub projects, filter repositories and connect with developers.">
+  <link rel="canonical" href="https://peteroxhka.github.io/repo-radar/">
+  <meta name="robots" content="index,follow">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Repo Radar · Discover open-source projects">
+  <meta property="og:description" content="Find GitHub projects by name, language, category and stars. Browse Console WebKit projects and their verified GitHub Pages links.">
+  <meta property="og:url" content="https://peteroxhka.github.io/repo-radar/">
+  <meta name="twitter:card" content="summary">
   <title>Repo Radar · Discover together</title>
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./app.js"></script>
+  <script nomodule src="./unsupported-browser.js"></script>
 </head>
 <body data-theme="dark">
+  <noscript><p class="compat-notice" role="alert">Repo Radar requires JavaScript. Please enable it in a modern browser.</p></noscript>
   <div class="ambient" aria-hidden="true"></div>
   <header class="topbar">
     <div class="topbar-inner">
       <a class="brand" href="./" aria-label="Repo Radar"><span class="brand-mark">R<span class="brand-dot">.</span></span><span>repo<span class="brand-thin">radar</span></span></a>
       <nav class="nav" aria-label="Main navigation">
-        <button class="nav-item active" id="tab-discover" data-i18n="discover">Обзор</button>
-        <button class="nav-item" id="tab-messages" data-i18n="messages">Сообщения</button>
+        <button class="nav-item active" id="tab-discover" data-i18n="discover" type="button" aria-current="page">Discover</button>
+        <button class="nav-item" id="tab-messages" data-i18n="messages" type="button">Messages</button>
+        <button class="nav-item hidden" id="tab-admin" type="button" data-i18n="adminPanel">Admin</button>
       </nav>
       <div class="top-actions">
         <select id="locale" class="small-select" aria-label="Language"></select>
@@ -25,7 +37,7 @@
           <option value="light" data-i18n="lightTheme">Светлая</option>
           <option value="cosmic" data-i18n="cosmicTheme">Космос</option>
         </select>
-        <button class="button button-outline" id="auth-open" data-i18n="signIn">Войти</button>
+        <button class="button button-outline" id="auth-open" data-i18n="signIn" type="button">Sign in</button>
         <button class="profile-pill hidden" id="profile-open" aria-label="Open profile">
           <span class="avatar-mini" id="top-avatar">R</span><span id="top-username">Профиль</span>
         </button>
@@ -107,9 +119,54 @@
         </div>
       </div>
     </section>
-    <footer>Repo Radar <span>·</span> <span data-i18n="footerNote">Независимый каталог открытого кода</span></footer>
+    <section id="view-admin" class="hidden admin-section">
+      <div class="section-heading messages-heading">
+        <div><p class="section-kicker">PRIVATE MANAGEMENT</p>
+          <h1 data-i18n="adminPanel">Admin panel</h1>
+          <p class="lead compact" data-i18n="adminIntro">Catalog health and reversible moderation. Available only to the verified site owner.</p>
+        </div>
+      </div>
+      <div id="admin-stats" class="admin-stats" aria-live="polite"></div>
+      <div class="admin-browser">
+        <h2 data-i18n="adminCatalog">Manage repositories</h2>
+        <p class="hint" data-i18n="adminCatalogHint">Search project names and hide inappropriate entries. Changes can be reversed.</p>
+        <form id="admin-search-form" class="admin-search-form">
+          <label class="sr-only" for="admin-project-search" data-i18n="adminSearch">Find repository</label>
+          <input id="admin-project-search" type="search" placeholder="Repository name or owner/repo" autocomplete="off" maxlength="80">
+          <button type="submit" class="button button-primary" data-i18n="adminFind">Search</button>
+        </form>
+        <div id="admin-project-list" class="admin-project-list"></div>
+        <p id="admin-status" class="hint" role="status"></p>
+      </div>
+      <p class="hint admin-note" data-i18n="adminSafety">Only catalog visibility is editable here. Accounts, conversations and database settings are not accessible.</p>
+    </section>
+    <footer>Repo Radar <span>·</span> <span data-i18n="footerNote">Independent open-source discovery</span>
+        <div class="footer-utilities">
+          <button id="reload-latest" class="footer-refresh" type="button" data-i18n="refreshLatest">Load latest version</button>
+          <span class="build-info">Build <code>__BUILD_SHA__</code></span>
+        </div>
+      </footer>
   </main>
 
+  <dialog id="repo-dialog" class="modal repo-modal" aria-labelledby="repo-detail-title">
+    <div class="modal-inner repo-detail-inner">
+      <button class="close" type="button" data-close="repo-dialog" aria-label="Close">×</button>
+      <p class="section-kicker" data-i18n="repoDetails">Project details</p>
+      <h2 id="repo-detail-title">Project</h2>
+      <p id="repo-detail-description" class="repo-detail-description"></p>
+      <div id="repo-detail-tags" class="repo-detail-tags"></div>
+      <div class="repo-preview-heading">
+        <h3 data-i18n="projectScreenshots">Screenshots</h3>
+        <p id="repo-images-status" class="hint" role="status"></p>
+      </div>
+      <div id="repo-images" class="repo-screenshots" aria-label="Screenshots from the project README"></div>
+      <div class="repo-detail-links">
+        <a id="repo-source-link" class="button button-primary" target="_blank" rel="noopener noreferrer" data-i18n="sourceCode">Source on GitHub</a>
+        <a id="repo-owner-link" class="button button-outline" target="_blank" rel="noopener noreferrer" data-i18n="projectAuthor">Author</a>
+        <a id="repo-live-link" class="button button-outline hidden" target="_blank" rel="noopener noreferrer" data-i18n="visitSite">Visit project website</a>
+      </div>
+    </div>
+  </dialog>
   <dialog id="auth-dialog" class="modal">
     <form id="auth-form" class="modal-inner">
       <button type="button" class="close" data-close="auth-dialog" aria-label="Close">×</button>
