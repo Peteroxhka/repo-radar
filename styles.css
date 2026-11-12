@@ -240,3 +240,74 @@ body{padding-bottom:env(safe-area-inset-bottom,0px)}
  .admin-integration .button{width:100%}
  .admin-repo-github{align-self:flex-start}
 }
+
+/* Project inspector v2: visual + short description at the side,
+   followed by a bilingual long-form description. No screenshot galleries. */
+.repo-modal{width:min(1040px,calc(100vw - 26px));max-height:min(92dvh,920px);overflow-y:auto;overscroll-behavior:contain}
+.repo-detail-inner{display:block;padding:clamp(17px,3vw,32px);position:relative}
+.repo-detail-layout{display:grid;grid-template-columns:minmax(215px,310px) minmax(0,1fr);gap:clamp(18px,3vw,32px);align-items:start}
+.repo-detail-aside{display:flex;flex-direction:column;gap:16px;min-width:0}
+.repo-visual{margin:0;width:100%;aspect-ratio:1/1;background:#000;display:grid;place-items:center;border:1px solid var(--border);border-radius:17px;overflow:hidden;box-shadow:0 14px 38px rgba(0,0,0,.17)}
+.repo-visual img{display:block;width:100%;height:100%;object-fit:contain;background:#000}
+.repo-side-card{min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:15px;padding:17px}
+.repo-side-card h3{font-family:'Space Grotesk',sans-serif;font-size:15px;margin:0 0 10px;color:var(--text)}
+.repo-short-description{font-size:13px;line-height:1.7;overflow-wrap:anywhere;color:var(--muted);white-space:pre-wrap}
+.repo-detail-main{display:flex;flex-direction:column;gap:18px;min-width:0;padding-top:8px}
+.repo-detail-main h2{font-size:clamp(23px,3vw,33px);overflow-wrap:anywhere;padding-right:30px}
+.repo-detail-main h2 a{color:var(--text);text-decoration:none}
+.repo-detail-main h2 a:hover{color:var(--accent)}
+.repo-detail-tags{display:flex;gap:7px;flex-wrap:wrap}
+.repo-detail-links{display:flex;gap:9px;flex-wrap:wrap}
+.repo-description-switch{display:flex;gap:7px;align-items:center;border-bottom:1px solid var(--border);padding-bottom:10px}
+.repo-desc-tab{border:1px solid var(--border);border-radius:11px;background:var(--surface2);color:var(--muted);padding:9px 16px;font-size:13px;font-weight:800;transition:background .2s,color .2s,border-color .2s,transform .2s}
+.repo-desc-tab.active,.repo-desc-tab[aria-selected=true]{color:var(--accent-text);background:var(--accent);border-color:var(--accent)}
+.repo-desc-tab:hover{transform:translateY(-1px)}
+.repo-description-panel{min-width:0;background:var(--surface2);padding:17px 19px;border:1px solid var(--border);border-radius:13px}
+.repo-description-panel h3{font-size:15px;margin:0 0 11px;color:var(--text)}
+.repo-full-description{font-size:13px;line-height:1.82;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--muted)}
+.repo-description-panel.animate-description{animation:repoTextAppear .29s cubic-bezier(.2,.8,.2,1) both}
+@keyframes repoTextAppear{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+.repo-card{animation:repoCardEnter .43s cubic-bezier(.18,.8,.25,1) both;will-change:opacity,transform}
+.repo-card:nth-child(2){animation-delay:35ms}.repo-card:nth-child(3){animation-delay:70ms}.repo-card:nth-child(4){animation-delay:105ms}
+.repo-card:nth-child(5){animation-delay:140ms}.repo-card:nth-child(6){animation-delay:175ms}
+@keyframes repoCardEnter{from{opacity:0;transform:translateY(13px)}to{opacity:1;transform:translateY(0)}}
+.repo-modal[open]{animation:repoDialogOpen .31s cubic-bezier(.16,1,.3,1) both}
+.repo-modal[open]::backdrop{animation:repoBackdropIn .27s ease both}
+.repo-modal.is-closing{animation:repoDialogClose .18s ease both}
+@keyframes repoDialogOpen{from{opacity:0;transform:translateY(16px) scale(.975)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes repoDialogClose{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(9px) scale(.985)}}
+@keyframes repoBackdropIn{from{opacity:0}to{opacity:1}}
+
+/* Cosmic theme retains its purple background; use pale green for the
+   readable landing-page text rather than the former white/pink accents. */
+body[data-theme=cosmic] .hero h1,
+body[data-theme=cosmic] .hero h1 em,
+body[data-theme=cosmic] .hero .lead,
+body[data-theme=cosmic] .hero .eyebrow,
+body[data-theme=cosmic] .hero .eyebrow span,
+body[data-theme=cosmic] .hero-stat,
+body[data-theme=cosmic] .hero-stat strong,
+body[data-theme=cosmic] .section-heading h2,
+body[data-theme=cosmic] .official-feature h2{color:#bdf3c7}
+body[data-theme=cosmic] .hero h1{text-shadow:0 0 16px rgba(189,243,199,.12)}
+@media(max-width:800px){
+ .repo-detail-layout{grid-template-columns:minmax(0,1fr)}
+ .repo-detail-aside{display:grid;grid-template-columns:minmax(135px,220px) minmax(0,1fr);align-items:start}
+ .repo-visual{max-width:220px}
+ .repo-detail-main{padding-top:2px}
+}
+@media(max-width:520px){
+ .repo-detail-aside{display:flex;gap:12px}
+ .repo-visual{max-width:190px;margin:0 auto}
+ .repo-detail-inner{padding:22px 16px}
+ .repo-detail-main h2{font-size:25px}
+ .repo-description-panel{padding:14px}
+ .repo-detail-links{flex-direction:column}
+ .repo-detail-links .button{width:100%}
+ .repo-modal{width:calc(100vw - 16px);max-height:calc(100dvh - 16px)}
+}
+@media(prefers-reduced-motion:reduce){
+ .repo-card,.repo-modal[open],.repo-modal.is-closing,.repo-modal[open]::backdrop,
+ .repo-description-panel.animate-description{animation:none!important}
+ .repo-desc-tab{transition:none}
+}

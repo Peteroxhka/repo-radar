@@ -1,14 +1,13 @@
 import {normalizeSearch, mergeMessages, isCurrentChat, dmConversationFilter, attachmentMime} from "./lib/core.mjs";
 import {createClient} from "https://esm.sh/@supabase/supabase-js@2.57.0";
 import {trustedGitHubPagesSite} from "./lib/catalog.mjs";
-import {readmeScreenshots} from "./lib/readme-previews.mjs";
 import {officialText} from "./lib/official-info.mjs";
 import {consoleMetadata,filterConsoleProjects,sortConsoleProjects,consoleFacetOptions} from "./lib/console-filters.mjs";
 import {SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, DATABASE_SCHEMA} from "./config.js";
 const sb=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{db:{schema:DATABASE_SCHEMA},auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const $=id=>document.getElementById(id);
 function generateUUID(){
- if(typeof crypto.randomUUID==="function")return generateUUID();
+ if(typeof crypto.randomUUID==="function")return crypto.randomUUID();
  // iOS / Android browsers predating crypto.randomUUID still support secure RNG.
  const bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
  bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
@@ -101,6 +100,65 @@ Object.assign(translations.ru,{
  supabaseInvalid:"Укажи адрес https://<проект>.supabase.co и publishable-ключ.",
  buildGuideLink:"Как создать свой сайт с Supabase"
 });
+
+
+// These paragraphs describe only Repo Radar itself. We never pretend to
+// have translated third-party maintainers' descriptions automatically.
+const projectLongDescription={
+ ru:`Repo Radar — открытый каталог репозиториев GitHub, созданный для поиска интересных проектов, исходного кода, инструментов разработчика и образовательных материалов. Вместо бесконечного просмотра случайных репозиториев здесь можно искать по названию и точному адресу owner/repository, выбирать категорию, язык программирования и сортировку по настоящему количеству звёзд.
+
+В каталоге есть отдельная категория «Консольные WebKit». Она помогает найти проекты, которые в своих метаданных упоминают WebKit и игровые консоли. Доступны фильтры по консоли, версии проекта, указанным версиям прошивки и типу прошивки. Показанные метаданные не являются подтверждением совместимости конкретного проекта с устройством.
+
+Карточка каждого проекта содержит краткое описание, ссылку на автора, исходный репозиторий и, когда адрес действительно известен, ссылку на опубликованный сайт GitHub Pages. На сайте также предусмотрены профили, вход через GitHub или электронную почту, личные сообщения и отправка поддерживаемых файлов.
+
+Техническая основа — HTML, CSS и JavaScript на GitHub Pages, Supabase для хранения данных и авторизации, а GitHub Actions собирает и обновляет каталог. Раздел администратора доступен только проверенному владельцу Repo Radar и позволяет управлять видимостью записей. Проект размещён с открытым исходным кодом; документация по запуску похожего каталога находится в репозитории.`,
+ en:`Repo Radar is an open-source GitHub repository discovery catalog designed to help people find interesting projects, source code, developer utilities, and educational resources. Instead of scrolling through unrelated repositories, visitors can search by repository name or exact owner/repository path, filter by category and programming language, and sort by real GitHub star counts.
+
+A dedicated Console WebKit category helps discover repositories whose published metadata mentions both WebKit and gaming consoles. Visitors can filter by console, project version, reported firmware version, and firmware type. These values come from repository metadata and should not be interpreted as independently verified device compatibility.
+
+Each project has a compact overview and links to its author, source repository, and a GitHub Pages website where a verified address is available. The site also includes user profiles, GitHub or email sign-in, direct messages, and supported file attachments.
+
+Repo Radar uses HTML, CSS, and JavaScript deployed on GitHub Pages, Supabase for data and authentication, and GitHub Actions to collect and refresh repository information. A restricted owner-only administration area supports catalog visibility management. The source code and instructions for building a similar project are available in its public GitHub repository.`
+};
+Object.assign(translations.en,{
+ shortDescription:"Short description",
+ descriptionRuHeading:"Описание на русском",
+ descriptionEnHeading:"Description in English",
+ descriptionUntranslatedRu:"Подтверждённый перевод на русский ещё не добавлен. Ниже приведено оригинальное описание автора:\\n\\n",
+ descriptionUntranslatedEn:"An English translation has not been provided for this repository. Original author description:\\n\\n"
+});
+Object.assign(translations.ru,{
+ shortDescription:"Краткое описание",
+ descriptionRuHeading:"Подробное описание на русском",
+ descriptionEnHeading:"Подробное описание на английском",
+ descriptionUntranslatedRu:"Подтверждённый перевод на русский ещё не добавлен. Ниже приведено оригинальное описание автора:\\n\\n",
+ descriptionUntranslatedEn:"An English translation has not been provided for this repository. Original author description:\\n\\n"
+});
+const PROJECT_FALLBACK_IMAGE="./assets/nobody-came.png";
+function getProjectImage(repo){
+ for(const prop of ["preview_image","open_graph_image","logo_url","image_url"]){
+  const value=repo?.[prop];
+  if(typeof value!=="string")continue;
+  try{
+   const url=new URL(value);
+   if(url.protocol!=="https:"||url.username||url.password)continue;
+   if(["raw.githubusercontent.com","user-images.githubusercontent.com","github.com"].includes(url.hostname)||
+      url.hostname.endsWith(".githubusercontent.com"))return url.href;
+  }catch{}
+ }
+ return PROJECT_FALLBACK_IMAGE;
+}
+function getDescriptions(repo){
+ if(repo.full_name?.toLowerCase()==="peteroxhka/repo-radar")return projectLongDescription;
+ const original=String(repo.description||"").trim()||t("noDescription");
+ const ru=String(repo.description_ru||"").trim();
+ const en=String(repo.description_en||"").trim();
+ const containsRussian=/[а-яё]/i.test(original);
+ return {
+  ru:ru|| (containsRussian?original:t("descriptionUntranslatedRu")+original),
+  en:en|| (!containsRussian?original:t("descriptionUntranslatedEn")+original)
+ };
+}
 
 const categoryKeys=["all","programming","tools","ai","data","web","learning","games","console_webkit","other"];
 const localeNames={ru:"Русский",en:"English",es:"Español",fr:"Français",de:"Deutsch",pt:"Português",zh:"中文",ja:"日本語",ko:"한국어",ar:"العربية",hi:"हिन्दी",tr:"Türkçe"};
@@ -227,67 +285,70 @@ card.onclick=e=>{if(e.target.closest?.("a,button"))return;openProjectDetails(r);
 card.onkeydown=e=>{if(e.target===card&&(e.key==="Enter"||e.key===" ")){e.preventDefault();openProjectDetails(r);}};
 frag.append(card);} $("grid").replaceChildren(frag);}
 
-// Rich project preview. Only README images served from GitHub are displayed;
-// GitHub API rate limits and absent screenshots are handled gracefully.
-async function openProjectDetails(repo){
- const uid=++detailRequestEpoch;
- const source=String(repo.html_url||"");
- const fullname=String(repo.full_name||"");
- const parts=fullname.split("/");
- const canFetch=parts.length===2&&parts.every(p=>/^[a-zA-Z0-9_.-]+$/.test(p));
- const sourceUrl=canFetch?`https://github.com/${parts.map(encodeURIComponent).join("/")}`:null;
- const title=$("repo-detail-title");
- const titleLink=document.createElement("a");
- titleLink.textContent=repo.name||fullname;
- if(sourceUrl){titleLink.href=sourceUrl;titleLink.target="_blank";titleLink.rel="noopener noreferrer";}
- title.replaceChildren(titleLink);
- const desc=String(descriptionFor(repo)||t("noDescription")).trim();
- $("repo-detail-description").textContent=Array.from(desc).slice(0,950).join("")+(Array.from(desc).length>950?"…":"");
- const info=[repo.language,repo.category,`★ ${number(repo.stars)}`].filter(Boolean);
- const detailTags=info.map(value=>{const tag=document.createElement("span");tag.className="repo-tag";tag.textContent=value;return tag;});
- $("repo-detail-tags").replaceChildren(...detailTags);
- const sourceEl=$("repo-source-link");
- if(sourceUrl){sourceEl.href=sourceUrl;sourceEl.classList.remove("hidden");}
- else{sourceEl.removeAttribute("href");sourceEl.classList.add("hidden");}
- const ownerEl=$("repo-owner-link");
- if(canFetch){ownerEl.href=`https://github.com/${encodeURIComponent(parts[0])}`;ownerEl.classList.remove("hidden");}
- else{ownerEl.removeAttribute("href");ownerEl.classList.add("hidden");}
- const live=trustedGitHubPagesSite(repo.site_url||repo.homepage)||featuredSiteLinks[fullname.toLowerCase()];
- const liveEl=$("repo-live-link");
- if(live){liveEl.href=live;liveEl.classList.remove("hidden");}
- else{liveEl.removeAttribute("href");liveEl.classList.add("hidden");}
- $("repo-images").replaceChildren();
- setStatus("repo-images-status",t("screenshotsLoading"));
- openDialog("repo-dialog");
- if(!canFetch){setStatus("repo-images-status",t("screenshotsNone"));return;}
- try{
-  const res=await fetch(`https://api.github.com/repos/${encodeURIComponent(parts[0])}/${encodeURIComponent(parts[1])}/readme`,{
-   headers:{Accept:"application/vnd.github+json"}
-  });
-  if(uid!==detailRequestEpoch||!$("repo-dialog").open)return;
-  if(res.status===404){setStatus("repo-images-status",t("screenshotsNone"));return;}
-  if(!res.ok)throw Error("GitHub README "+res.status);
-  const data=await res.json();
-  const encoded=String(data.content||"").replace(/\s/g,"");
-  if(!encoded||encoded.length>1_400_000)throw Error("README not available for preview");
-  const binary=atob(encoded);
-  const bytes=Uint8Array.from(binary,char=>char.charCodeAt(0));
-  const md=new TextDecoder("utf-8").decode(bytes);
-  const imgs=readmeScreenshots(md,data.download_url);
-  if(uid!==detailRequestEpoch||!$("repo-dialog").open)return;
-  if(!imgs.length){setStatus("repo-images-status",t("screenshotsNone"));return;}
-  const gallery=imgs.map(item=>{
-   const link=document.createElement("a");link.href=item.src;link.target="_blank";link.rel="noopener noreferrer";
-   const img=document.createElement("img");img.src=item.src;img.alt=item.alt;
-   img.loading="lazy";img.decoding="async";img.referrerPolicy="no-referrer";
-   link.append(img);return link;
-  });
-  $("repo-images").replaceChildren(...gallery);
-  setStatus("repo-images-status","");
- }catch(e){
-  console.warn("README preview:",e.message);
-  if(uid===detailRequestEpoch&&$("repo-dialog").open)setStatus("repo-images-status",t("screenshotsUnavailable"));
+// Show a calm animated detail panel. Screenshot fetching is intentionally removed.
+function setProjectDescriptionLanguage(value){
+ const selected=value==="ru"?"ru":"en";
+ for(const code of ["ru","en"]){
+  const active=code===selected;
+  const tab=$("repo-desc-tab-"+code),panel=$("repo-panel-"+code);
+  tab.classList.toggle("active",active);
+  tab.setAttribute("aria-selected",String(active));
+  tab.tabIndex=active?0:-1;
+  panel.classList.toggle("hidden",!active);
+  if(active){panel.classList.remove("animate-description");void panel.offsetWidth;panel.classList.add("animate-description");}
+  else panel.classList.remove("animate-description");
  }
+}
+for(const language of ["ru","en"]){
+ $("repo-desc-tab-"+language).onclick=()=>setProjectDescriptionLanguage(language);
+ $("repo-desc-tab-"+language).onkeydown=event=>{
+  if(!["ArrowLeft","ArrowRight","Home","End"].includes(event.key))return;
+  event.preventDefault();
+  const target=event.key==="Home"?"ru":event.key==="End"?"en":language==="ru"?"en":"ru";
+  setProjectDescriptionLanguage(target);$("repo-desc-tab-"+target).focus();
+ };
+}
+function openProjectDetails(repo){
+ detailRequestEpoch++;
+ const fullname=String(repo.full_name||"");
+ const pieces=fullname.split("/");
+ const valid=pieces.length===2&&pieces.every(p=>/^[A-Za-z0-9_.-]+$/.test(p));
+ const url=valid?"https://github.com/"+pieces.map(encodeURIComponent).join("/"):null;
+ const title=$("repo-detail-title"),titleLink=document.createElement("a");
+ titleLink.textContent=repo.name||fullname;
+ if(url){titleLink.href=url;titleLink.target="_blank";titleLink.rel="noopener noreferrer";}
+ title.replaceChildren(titleLink);
+ const short=String(descriptionFor(repo)||t("noDescription")).trim();
+ $("repo-detail-description").textContent=Array.from(short).slice(0,280).join("")+(Array.from(short).length>280?"…":"");
+ const text=getDescriptions(repo);
+ $("repo-description-ru").textContent=text.ru;
+ $("repo-description-en").textContent=text.en;
+ const pic=$("repo-preview-image");
+ pic.onerror=null;
+ pic.alt=repo.name?repo.name+" — project image":"* But nobody came.";
+ pic.onerror=()=>{
+  pic.onerror=null;
+  pic.src=PROJECT_FALLBACK_IMAGE;
+  pic.alt="* But nobody came.";
+ };
+ pic.src=getProjectImage(repo);
+ const labels=[repo.language,repo.category,"★ "+number(repo.stars)].filter(Boolean);
+ const tags=labels.map(value=>{
+  const span=document.createElement("span");span.className="repo-tag";span.textContent=value;return span;
+ });
+ $("repo-detail-tags").replaceChildren(...tags);
+ const source=$("repo-source-link"),owner=$("repo-owner-link");
+ for(const [element,target] of [[source,url],[owner,valid?"https://github.com/"+encodeURIComponent(pieces[0]):null]]){
+  if(target){element.href=target;element.classList.remove("hidden");}
+  else{element.removeAttribute("href");element.classList.add("hidden");}
+ }
+ const live=trustedGitHubPagesSite(repo.site_url||repo.homepage)||
+  featuredSiteLinks[fullname.toLowerCase()];
+ const site=$("repo-live-link");
+ if(live){site.href=live;site.classList.remove("hidden");}
+ else{site.removeAttribute("href");site.classList.add("hidden");}
+ setProjectDescriptionLanguage(locale==="ru"?"ru":"en");
+ openDialog("repo-dialog");
 }
 
 async function loadRepos(reset=true){
@@ -410,9 +471,21 @@ function openDialog(id){
 }
 function closeDialog(id){
  const d=$(id);if(!d)return;
- if(typeof d.close==="function"&&d.open)d.close();
- else{d.removeAttribute("open");d.classList.remove("legacy-dialog-open");}
- if(id==="repo-dialog")detailRequestEpoch++;
+ const finish=()=>{
+  d.classList.remove("is-closing");
+  if(typeof d.close==="function"&&d.open)d.close();
+  else{d.removeAttribute("open");d.classList.remove("legacy-dialog-open");}
+ };
+ if(id==="repo-dialog"){
+  detailRequestEpoch++;
+  if(d.open&&!window.matchMedia("(prefers-reduced-motion: reduce)").matches){
+   d.classList.add("is-closing");
+   const guard=window.setTimeout(finish,220);
+   d.addEventListener("animationend",()=>{window.clearTimeout(guard);finish();},{once:true});
+   return;
+  }
+ }
+ finish();
 }
 document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>closeDialog(b.dataset.close));
 $("repo-dialog").addEventListener("close",()=>{detailRequestEpoch++;});

@@ -1,73 +1,229 @@
 # Repo Radar
 
-GitHub open-source discovery feed + community features. A responsive static app hosted on GitHub Pages, backed by Supabase.
+**Languages:** [Русский](#русский) · [English](#english)
 
-## Included
+**Live website:** https://peteroxhka.github.io/repo-radar/  
+**Source code:** https://github.com/Peteroxhka/repo-radar  
+**Build guide:** [How to create a similar website with Supabase](docs/BUILD_WITH_SUPABASE.md)
 
-- Large public GitHub repository catalog, imported incrementally from GitHub's official public-repositories endpoint
-- Discovery feed refreshed with popular, recently active projects every six hours
-- Responsive catalog with server-side search, language/category filters, infinite scrolling, and manual pagination fallback
-- Dark, light, and cosmic themes; theme saved on the device
-- Language switcher: English, Russian, Spanish, French, German, Portuguese, Chinese, Japanese, Korean, Arabic, Hindi and Turkish. English fallback is used for untranslated strings. **Not all languages in the world are translated yet.**
-- Supabase Auth: GitHub OAuth or email/password signup, email confirmation, account sign-out
-- Public profile username; custom uploaded avatar for email accounts; GitHub OAuth users see their GitHub avatar
-- Private one-to-one messages and file attachments (25 MB limit; allowlisted formats; no calls)
-- Row Level Security for private messages and private Supabase Storage bucket
+---
 
-## IMPORTANT: complete Supabase setup before enabling community features
+# Русский
 
-1. Open the Supabase project referenced in `config.js` (its URL and publishable key are browser-safe). Back up the database.
-2. First run `supabase/migrations/20261111_base.sql` (also safe for an existing catalog). Then run `supabase/migrations/20261112_community.sql` in the **Supabase SQL Editor** with a privileged project administrator. This creates profiles, messages, storage buckets and RLS. It does not delete the existing `repo_radar.repos` feed.
-3. Run `supabase/migrations/20261112_public_catalog.sql`. It adds metadata columns and a private cursor table for resumable bulk import. It does not delete existing repositories.
-4. Run `supabase/migrations/20261112_catalog_api_hardening.sql`. It makes the browser catalog read-only and adds a safe language-list function.
-5. Run `supabase/migrations/20261112_private_profile_trigger.sql`, then `supabase/migrations/20261113_chat_reliability.sql`. These are repeatable and preserve data. This repository uses manual SQL Editor scripts in the documented order, not a Supabase CLI migration history (the legacy files share a date prefix).
+## Что такое Repo Radar
 
-   In Supabase **Settings → API → Exposed schemas**, add `repo_radar` if it isn't already exposed. Keep `collector_state` inaccessible to `anon` and `authenticated`; only the service role needs it.
-6. In **Authentication → Providers**, enable Email and GitHub. For GitHub OAuth, create a GitHub OAuth App with its callback URL set to the **Supabase Auth callback** provided by Supabase (usually `https://<project-ref>.supabase.co/auth/v1/callback`). Store the OAuth client secret only in Supabase; do **not** commit it. Set the site's origin and full GitHub Pages URL as allowed redirects in **Authentication → URL Configuration**.
-7. On GitHub Pages, make sure **Settings → Pages → Source = GitHub Actions**. The existing `pages.yml` publishes `main` automatically.
-8. In GitHub **Settings → Secrets and variables → Actions**, set `SUPABASE_SERVICE_KEY` to a current secret/service-role key from the exact Supabase project in `config.js`. Never put this key in `config.js` or commit it. The public browser only uses the publishable key.
-9. Run **Actions → Collect repositories → Run workflow**. Each run imports up to 25,500 public repositories (850 API pages × 30 items) and saves its cursor. The hourly schedule continues the import automatically; after the first 100,000+ records, it keeps indexing newly created public repositories. The importer uses GitHub's official `GET /repositories?since=<last-repository-id>` endpoint, which lists public repositories in creation order. The built-in `GITHUB_TOKEN` is limited to 1,000 REST requests per hour per repository, so each run reserves headroom and resumes in the next run.
-10. Test with two separate accounts: email signup, GitHub sign-in, avatar upload, messages in both directions, a 25-MB-or-smaller document attachment, and verify a third account cannot read either user's messages or attachments.
+**Repo Radar** — открытый веб-каталог проектов на GitHub. Он помогает находить интересные репозитории, инструменты разработчика, проекты искусственного интеллекта, игры, веб-приложения, учебные материалы и проекты для работы с данными.
 
-## Catalog notes
+Вместо того чтобы искать по отдельным страницам GitHub, можно открыть одну ленту, ввести название проекта или полный адрес `владелец/репозиторий`, выбрать категорию и настроить сортировку. Проекты сохраняют ссылки на исходный код и автора. Если в метаданных действительно указан адрес опубликованного сайта на `*.github.io`, появляется и отдельная ссылка на него.
 
-- This is a real metadata index of public GitHub repositories, not a clone of GitHub's code or Git objects. It stores repository IDs, names, descriptions, topics, languages, stars, license identifiers, dates, and basic repository statistics.
-- Public GitHub repositories are not automatically open source. A missing `license_spdx` means GitHub did not identify a repository license; check the repository's own terms before reusing its code.
-- The public-repository endpoint paginates by repository ID. The importer persists the last ID only after the corresponding rows have been committed, so interrupted runs resume safely. Existing rows are merged by GitHub repository ID.
-- The bulk list is ordered by creation date; the separate topic searches refresh popular, recently active projects so the top of the feed remains useful while the historical catalog is growing.
-- GitHub API and Supabase limits apply. The importer is deliberately incremental rather than trying to make thousands of unbounded calls in one workflow run.
+Проект задуман не как замена GitHub и не как хранилище копий чужого исходного кода. Это **публичный индекс метаданных репозиториев** с собственным интерфейсом обнаружения проектов.
 
-## Limitations
+## Возможности
 
-Uploads are limited to 25 MB and allowlisted file formats. The storage policy is designed to prevent casual cross-user access; for production-scale moderation or malware checks, introduce a dedicated scanning and abuse-reporting workflow. Messages are protected by Supabase RLS but are **not end-to-end encrypted**. Localizations need native-speaker review. Passwords are handled by Supabase Auth, not stored by Repo Radar.
+### Поиск и каталог
 
-## Catalog API hardening
+- Поиск по имени репозитория, а также по точному пути `owner/repository`. Ник владельца сам по себе не должен подменять совпадение по названию.
+- Дополнительный поиск по описанию и темам, включаемый отдельно.
+- Категории: код, инструменты, ИИ, данные, веб, обучение, игры, консольные WebKit и неклассифицированные проекты.
+- Сортировки по количеству звёзд (от больших к меньшим и обратно), недавним изменениям, дате создания и числу форков.
+- Фильтрация по языку программирования, постепенная загрузка каталога и счётчики категорий.
+- Исключение форков и архивных репозиториев из публичной выдачи.
+- Выделение официального репозитория Repo Radar и прямые ссылки на исходники и сайт.
 
-The browser can only read repository rows. The importer uses the service role for writes. The `list_repo_languages()` SQL function runs as the caller (not SECURITY DEFINER) and supplies the language filter options without loading the whole catalog into the browser.
+### Консольные WebKit
 
+В отдельной категории собираются проекты, в метаданных которых одновременно упоминаются WebKit и конкретные игровые консоли. Доступны фильтры **консоль**, **версия проекта**, **версия прошивки** и **тип прошивки**; названия консолей отсортированы по алфавиту. Для PS4 предусмотрены семейства версий вплоть до `14.XX`.
 
-## Reliability update and PS4 collection
+**Важно:** упоминание версии в репозитории или наличие варианта в фильтре **не является доказательством совместимости** с определённой консолью или прошивкой. Сайт не запускает код из найденных репозиториев.
 
-- Unicode repository search preserves Russian, English and technical names such as `owner/repo`, `C++`, and `C#`.
-- PS4 tab includes the requested Akela-x project, OpenOrbis, ps4sdk and shadPS4. It links to source repositories and can search the main catalog. The curated list works independently of the importer; no repository code is executed by this section.
-- Chat history has an older-messages button and stable timestamp/ID cursors. Refresh merges new messages without discarding loaded history.
-- Conversation requests and subscriptions are isolated by session/selection generation. All contacts are loaded, using a distinct-peer RPC after the database update and a paginated fallback before it.
-- A new Storage policy allows cleanup of the sender's unsent attachments; already referenced message attachments cannot be deleted through this policy.
-- Run `node --test tests/*.test.mjs` and `node --input-type=module --check < app.js`. The Pages workflow runs these checks before deploying.
+### Карточки и описание проекта
 
-For an existing deployment, apply the bootstrap if needed, the corrected private-trigger script, and the new chat-reliability SQL in the Supabase SQL Editor. A GitHub push deploys the frontend only; it does not apply database SQL. Verify with two authenticated accounts plus a third account for access isolation.
+Нажатие на карточку открывает окно с плавной анимацией. В нём находятся:
 
-## 2026-11-14 reliability / upload security patch
+- область изображения проекта и краткое описание сбоку;
+- подробное описание на **русском** и **английском** в отдельных переключаемых вкладках;
+- ссылки на исходники, автора и опубликованный сайт, если адрес известен;
+- метаданные проекта: категория, язык программирования и количество звёзд.
 
-Apply `supabase/migrations/20261114_storage_hardening.sql` after the chat reliability script.
-It changes Storage RLS and removes the unrestricted `application/octet-stream` upload type without removing existing user files. Uploads still support documents, photos, audio, video and archives with known MIME types. Receivers can only read files referenced by messages sent to them. Existing files owned by senders remain accessible to their senders. This is not malware scanning; public deployments need scanning, rate limits and abuse reporting.
+Вместо галереи скриншотов используется **одно изображение проекта**. Если автор не предоставил доступное изображение, показывается локальное изображение-заглушка с надписью `* But nobody came.`. Его чёрный фон, пиксельный шрифт и исходная композиция сохранены.
 
-The chat UI now uses exactly **one PostgREST OR filter per message query**, ensuring the sender/recipient pair is never lost when cursor pagination is applied. OAuth errors returned as query/hash parameters appear in the login dialog instead of an unexplained home page. New tests cover these cases. GitHub OAuth still requires the provider and signup permissions to be enabled in Supabase Auth settings.
+Для собственного проекта Repo Radar подробные описания подготовлены на двух языках. Репозитории сторонних авторов могут не иметь перевода: в этом случае сайт показывает оригинальное описание и явно сообщает об отсутствии подтверждённого перевода, не выдавая машинные догадки за слова разработчика.
 
-## Build a similar site with Supabase
+### Интерфейс и сообщество
 
-Follow the step-by-step **[Supabase + GitHub Pages guide](docs/BUILD_WITH_SUPABASE.md)** (Russian with an English quick start). It explains RLS, OAuth, server-side import, deployment, and how to secure administrator functions.
+- Тёмная, светлая и космическая темы; выбор сохраняется в браузере.
+- Бледно-зелёный текст главного блока в космической теме при сохранении фиолетового оформления.
+- Поддержка современных браузеров на Windows, macOS, Linux, Android и iOS, адаптивная вёрстка для телефонов и планшетов.
+- Плавные анимации с учётом настройки «Уменьшение движения».
+- Переключатель интерфейса между 12 языками. Описания сторонних проектов не переводятся автоматически.
+- Авторизация по электронной почте и через GitHub OAuth с помощью Supabase Auth.
+- Профили, аватары, личные сообщения и ограниченная загрузка файлов.
 
-The **Connect Supabase** button inside the owner-only admin panel checks the existing connection or the public API of another Supabase project. It does **not** connect an external project for administration or store its publishable key. Never input secret/service-role keys in the browser.
+Личные сообщения защищаются политиками доступа Supabase. Они **не являются сквозным шифрованием (E2EE)**.
 
-The official Repo Radar banner is translated into the 12 languages supported by the site. Console WebKit filters include alphabetically sorted consoles and PS4 firmware families up to 14.XX; firmware filters represent repository claims, **not verified compatibility**. Searching a new term resets old category/language constraints so an earlier filter cannot silently hide results.
+### Административная панель
+
+Панель администратора доступна только подтверждённому владельцу Repo Radar через GitHub OAuth. Доступ проверяется **в Supabase на стороне сервера**, а не по видимости кнопки или редактируемому нику.
+
+Владелец может смотреть сводку по каталогу, находить репозитории, переходить на их GitHub-страницы, скрывать записи и возвращать их обратно. Действия с видимостью записываются в журнал.
+
+Кнопка **Connect Supabase / Привязать Supabase** проверяет существующее подключение и может проверить публичный API другого проекта по публичному ключу. Это **не** подключение чужого проекта для управления и **не** перенос рабочей базы. Сервисные ключи и пароли в браузере вводить нельзя.
+
+## Архитектура
+
+| Компонент | Назначение |
+| --- | --- |
+| HTML, CSS, JavaScript | Интерфейс и логика браузера |
+| GitHub Pages | Статический хостинг |
+| GitHub Actions | Тестирование, публикация и периодическое обновление каталога |
+| GitHub API | Публичные сведения о репозиториях |
+| Supabase Postgres | Каталог, профили и сообщения |
+| Supabase Auth | Электронная почта и GitHub OAuth |
+| Supabase Storage | Файлы и аватары с ограничениями доступа |
+| Row Level Security | Контроль прав на уровне базы данных |
+
+**Важно для безопасности:** в клиентском коде допустим только публичный publishable/anon key. Пароль базы, GitHub OAuth Client Secret и секретные ключи Supabase нельзя коммитить или вставлять на страницу.
+
+## Как запустить собственную копию
+
+1. Создайте собственный проект Supabase и сохраните его URL и **публичный publishable key**.
+2. Изучите SQL-файлы в каталоге `supabase/migrations/`. Это история развития действующей базы, а не универсальный установщик: часть миграций зависит от предыдущей схемы. Применяйте их только в правильном порядке и после резервного копирования.
+3. Разрешите доступ к требуемой публичной схеме через настройки Supabase API. Настройте RLS так, чтобы гости могли читать только публичные данные, но не изменять каталог и не читать личные сообщения.
+4. Укажите **свои** URL и публичный ключ в `config.js`. Не используйте чужой проект.
+5. Для GitHub OAuth создайте приложение в Developer Settings GitHub и настройте callback на `https://ВАШ-ПРОЕКТ.supabase.co/auth/v1/callback`. Адрес своего сайта добавьте в разрешённые URL Supabase Auth.
+6. Создайте собственный репозиторий, включите GitHub Pages с источником **GitHub Actions**.
+7. Для серверного импортёра, если он нужен, добавьте собственный Supabase service-role/secret key исключительно в закрытые **GitHub Actions Secrets**.
+8. Проверьте поиск, авторизацию, права, мобильную вёрстку и возврат с OAuth на двух отдельных тестовых аккаунтах.
+
+**Не копируйте привязку администратора к GitHub identity владельца Repo Radar.** Для другого проекта нужна ваша собственная подтверждённая учётная запись и отдельная настройка прав.
+
+Развёрнутая инструкция: **[BUILD_WITH_SUPABASE.md](docs/BUILD_WITH_SUPABASE.md)**.
+
+## Проверка качества и ограничения
+
+Для локальных тестов:
+
+```bash
+node --test tests/*.test.mjs
+node --input-type=module --check < app.js
+node --check lib/core.mjs
+```
+
+Сборка в GitHub Actions проверяет JavaScript и тесты, затем готовит версионированные статические ресурсы для GitHub Pages. Успешная публикация **не гарантирует** исправную работу Supabase, входа или внешних API: проверяйте их отдельно в браузере.
+
+Работа каталога зависит от GitHub API, сетевых ограничений и доступности Supabase. Репозитории могут не иметь описания, лицензии или опубликованной страницы. Публичный GitHub-репозиторий не обязательно распространяется под открытой лицензией: перед использованием чужого кода проверьте его условия.
+
+---
+
+# English
+
+## What is Repo Radar?
+
+**Repo Radar** is an open-source web catalog for discovering GitHub repositories. It brings developer utilities, AI projects, games, web applications, educational resources, and data tools into a single searchable interface.
+
+Instead of browsing many unrelated pages, visitors can search by a repository's name or its exact `owner/repository` path, choose a category, and select a meaningful sort order. Every listing keeps a link to the original source and its author. If GitHub metadata supplies a verified `*.github.io` website, a direct website link is displayed as well.
+
+Repo Radar is **not** a GitHub replacement and does not mirror third-party source repositories. It is a public metadata index with a discovery-focused interface.
+
+## Features
+
+### Catalog and discovery
+
+- Repository-title search and exact `owner/repository` lookup. Owner handles alone are not used as title matches.
+- Optional searching in repository descriptions and topics.
+- Categories for code, developer tools, AI, data, web, learning, games, Console WebKit, and uncategorized projects.
+- Sorting by GitHub stars, least-starred first, last activity, creation date, and fork count.
+- Programming-language filtering, paginated loading, and category counts.
+- Forks and archived projects excluded from normal public results.
+- A first-party Repo Radar feature block linking directly to the official code and website.
+
+### Console WebKit catalog
+
+The dedicated Console WebKit category groups repositories whose published metadata explicitly mentions both WebKit and a gaming console. Extra selectors cover **console**, **project version**, **reported firmware version**, and **firmware type**. Console names appear alphabetically, and the PS4 series filter includes families up to `14.XX`.
+
+**Compatibility warning:** a firmware version shown in metadata or offered as a filter is **not independent confirmation of compatibility**. Repo Radar does not execute code from indexed repositories.
+
+### Project detail view
+
+Selecting a project opens a smoothly animated detail panel containing:
+
+- one project image with a short description beside it;
+- separate **Russian** and **English** long-description tabs;
+- source, author, and available website links;
+- programming language, category, and actual GitHub stars.
+
+Screenshot galleries have been removed. When a project has no usable image, the site uses the locally bundled `* But nobody came.` placeholder, preserving the original black background, pixel-style lettering, and composition.
+
+Repo Radar itself has editorial long-form descriptions in both languages. For third-party repositories, the original maintainer's text is retained; when a verified translation has not been provided, the interface explicitly says so rather than inventing one.
+
+### Design, users, and community
+
+- Dark, light, and cosmic appearance modes saved in the browser.
+- Pale green landing-page typography in the cosmic theme while retaining its purple background.
+- Responsive layouts for modern desktop and mobile browsers on Windows, macOS, Linux, Android, and iOS.
+- Animated cards and dialogs with support for reduced-motion preferences.
+- A 12-language interface, with English as the default for new visitors.
+- Email/password and GitHub OAuth sign-in through Supabase Auth.
+- Profiles, avatars, direct messages, and restricted attachment uploads.
+
+Direct messages use Supabase access controls; **they are not end-to-end encrypted**.
+
+### Owner-only administration
+
+The private admin panel is restricted to the verified GitHub identity of Repo Radar's owner. Authorization is enforced by **server-side Supabase functions**, not by a hidden menu item or an editable display name.
+
+The owner can inspect catalog totals, find projects, open their original GitHub pages, hide unsuitable listings, and restore them. Visibility changes are logged.
+
+The **Connect Supabase** control checks the existing project or tests a separate project's public API with a publishable key. It **does not** grant administrative access to another database, move data, or persist external keys. Never enter private credentials into browser-side forms.
+
+## Technical architecture
+
+| Technology | Responsibility |
+| --- | --- |
+| HTML, CSS, JavaScript | Client interface and user interactions |
+| GitHub Pages | Static hosting |
+| GitHub Actions | Tests, deployment, and periodic catalog collection |
+| GitHub API | Public repository metadata |
+| Supabase Postgres | Catalog, profiles, messages |
+| Supabase Auth | Email and GitHub OAuth sign-in |
+| Supabase Storage | Restricted file and avatar storage |
+| Row Level Security (RLS) | Database authorization |
+
+Only a **public publishable/anon key** belongs in browser JavaScript. Never expose a Supabase secret/service-role key, a database password, or a GitHub OAuth Client Secret.
+
+## Self-hosting and setup
+
+1. Create a **new Supabase project** and obtain its URL and public publishable key.
+2. Review the SQL scripts in `supabase/migrations/`. They reflect the evolution of a live database and are **not** a one-click generic installer. Back up your database and apply dependencies in order.
+3. Expose only the required public schema via Supabase API settings. Enable RLS and restrict write operations and private messages appropriately.
+4. Configure `config.js` with your **own** Supabase URL and public key.
+5. For GitHub OAuth, create an app in GitHub Developer Settings and set its callback to your Supabase Auth callback `https://YOUR-PROJECT.supabase.co/auth/v1/callback`. Allow your deployment URL in Supabase Auth redirect settings.
+6. Push your fork to your own GitHub repository and enable Pages via **GitHub Actions**.
+7. If you enable server-side GitHub discovery, place the required service-role/secret key **only** in protected GitHub Actions Secrets.
+8. Test login, search, access controls, mobile layouts, and redirects using multiple accounts.
+
+Do **not** reuse this deployment's specific administrator OAuth identity. Your own instance must have its own explicitly verified administrator and server-side authorization rules.
+
+For more detail, see **[the Supabase + GitHub Pages setup guide](docs/BUILD_WITH_SUPABASE.md)**.
+
+## Tests, limitations, and responsible use
+
+Run the main checks with:
+
+```bash
+node --test tests/*.test.mjs
+node --input-type=module --check < app.js
+node --check lib/core.mjs
+```
+
+GitHub Actions validates code, runs tests, and publishes versioned static assets. A green deployment job confirms that the static files were built; it does **not** guarantee that Supabase authentication, storage, or external APIs are available at runtime.
+
+Repository coverage depends on API limits and collection schedules. Some projects have no description, license, translation, or published website. Public availability on GitHub does not necessarily permit unrestricted reuse; check each repository's license and terms before copying code.
+
+---
+
+## Maintainer / Поддержка
+
+- Source / Исходный код: https://github.com/Peteroxhka/repo-radar
+- Live site / Сайт: https://peteroxhka.github.io/repo-radar/
+- Setup guide / Инструкция: [BUILD_WITH_SUPABASE.md](docs/BUILD_WITH_SUPABASE.md)
