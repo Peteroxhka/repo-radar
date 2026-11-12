@@ -17,6 +17,11 @@ ar:{discover:"استكشف",messages:"الرسائل",signIn:"دخول",darkThem
 hi:{discover:"खोजें",messages:"संदेश",signIn:"लॉग इन",darkTheme:"डार्क",lightTheme:"लाइट",cosmicTheme:"कॉस्मिक",eyebrow:"ओपन सोर्स. नए विचार.",headline:"अपना अगला <em>पसंदीदा प्रोजेक्ट</em> खोजें।",tagline:"GitHub प्रोजेक्ट हर छह घंटे में अपडेट होते हैं।",explore:"प्रोजेक्ट खोजें",projects:"प्रोजेक्ट",trending:"देखने लायक प्रोजेक्ट",all:"सभी",welcomeBack:"स्वागत है",yourMessages:"निजी संदेश",send:"भेजें",register:"साइन अप",username:"यूज़रनेम",password:"पासवर्ड",signOut:"लॉग आउट",yourProfile:"प्रोफ़ाइल",saveChanges:"सहेजें",startChat:"चैट शुरू करें"},
 tr:{discover:"Keşfet",messages:"Mesajlar",signIn:"Giriş",darkTheme:"Koyu",lightTheme:"Açık",cosmicTheme:"Kozmik",eyebrow:"AÇIK KAYNAK. YENİ FİKİRLER.",headline:"Yeni <em>favori projenizi</em> bulun.",tagline:"GitHub projeleri altı saatte bir güncellenir.",explore:"Projeleri keşfet",projects:"proje",trending:"Öne çıkan projeler",all:"Tümü",welcomeBack:"Hoş geldiniz",yourMessages:"Özel mesajlar",send:"Gönder",register:"Kaydol",username:"Kullanıcı adı",password:"Şifre",signOut:"Çıkış",yourProfile:"Profil",saveChanges:"Kaydet",startChat:"Sohbet başlat"}
 };
+const featuredSiteLinks={"dnestruev/messenger":"https://dnestruev.github.io/messenger/","peteroxhka/repo-radar":"https://peteroxhka.github.io/repo-radar/"};
+translations.ru.officialRadar="Официальный проект Repo Radar";
+translations.en.officialRadar="Official Repo Radar project";
+translations.ru.visitSite="Открыть сайт проекта";
+translations.en.visitSite="Visit project website";
 const categoryKeys=["all","programming","tools","ai","data","web","learning","games","other"];
 const localeNames={ru:"Русский",en:"English",es:"Español",fr:"Français",de:"Deutsch",pt:"Português",zh:"中文",ja:"日本語",ko:"한국어",ar:"العربية",hi:"हिन्दी",tr:"Türkçe"};
 const allowedExt=new Set(["jpg","jpeg","png","webp","gif","bmp","heic","mp4","webm","mov","m4v","mp3","ogg","wav","m4a","aac","flac","pdf","txt","md","csv","json","doc","docx","xls","xlsx","ppt","pptx","odt","ods","odp","zip","7z","rar"]);
@@ -51,7 +56,12 @@ async function updateLanguageOptions(){if(!state.languageOptionsLoaded){const{da
 function renderRepos(){const rows=state.allRows;const frag=document.createDocumentFragment();if(!rows.length){const empty=document.createElement("div");empty.className="empty";empty.textContent=t("noProjects");frag.append(empty);}
 for(const r of rows){const card=document.createElement("article");card.className="repo-card";const title=document.createElement("a");title.className="repo-title";title.textContent=r.name;try{const url=new URL(r.html_url);if(url.protocol==="https:"&&url.hostname==="github.com"){title.href=url.href;title.target="_blank";title.rel="noopener noreferrer";}}catch{}const desc=document.createElement("p");desc.className="repo-desc";desc.textContent=r.description||t("noDescription");const meta=document.createElement("div");meta.className="repo-meta";
 const things=[[r.owner_login,"repo-owner"],[r.language,"repo-tag"],["★ "+number(r.stars)],r.license_spdx?[r.license_spdx]:null,r.pushed_at?[new Date(r.pushed_at).toLocaleDateString(locale)]:null].filter(Boolean);
-for(const [str,cls] of things){const item=document.createElement("span");if(cls)item.className=cls;item.textContent=str;meta.append(item);}card.append(title,desc,meta);frag.append(card);} $("grid").replaceChildren(frag);}
+for(const [str,cls] of things){const item=document.createElement("span");if(cls)item.className=cls;item.textContent=str;meta.append(item);}
+if(r.full_name?.toLowerCase()==="peteroxhka/repo-radar"){const badge=document.createElement("span");badge.className="official-project-tag";badge.textContent=t("officialRadar");card.append(badge);}
+card.append(title,desc,meta);
+const projectSite=featuredSiteLinks[r.full_name?.toLowerCase()];
+if(projectSite){const site=document.createElement("a");site.className="project-site-link";site.href=projectSite;site.target="_blank";site.rel="noopener noreferrer";site.textContent=t("visitSite");card.append(site);}
+frag.append(card);} $("grid").replaceChildren(frag);}
 async function loadRepos(reset=true){
 if(!reset&&(state.loading||!state.hasMore))return;
 const requestId=++state.listRequestId;

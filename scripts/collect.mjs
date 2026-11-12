@@ -96,6 +96,32 @@ async function upsertBatch(part){
 async function upsert(rows){
  for(let i=0;i<rows.length;i+=12)await upsertBatch(rows.slice(i,i+12));
 }
+// Guaranteed catalog entries for the two official sites, regardless of stars.
+// Keep this list intentionally small; it is not an account-wide bulk import.
+const featuredOriginals=[
+ {fullName:"dnestruev/messenger",category:"tools",
+  homepage:"https://dnestruev.github.io/messenger/",
+  fallbackDescription:"Веб-мессенджер для обмена сообщениями"},
+ {fullName:"Peteroxhka/repo-radar",category:"web",
+  homepage:"https://peteroxhka.github.io/repo-radar/",
+  fallbackDescription:"Каталог проектов GitHub с поиском, категориями и сообществом"}
+];
+async function syncFeaturedOriginals(){
+ const toSave=[];
+ for(const item of featuredOriginals){
+  const repo=await getJson(`${API}/repos/${item.fullName}`);
+  if(!repo.id||!repo.full_name||repo.full_name.toLowerCase()!==item.fullName.toLowerCase()||repo.fork||repo.archived||repo.private)
+   throw new Error(`Featured repository is unavailable or ineligible: ${item.fullName}`);
+  const entry=row(repo,item.category);
+  entry.homepage=item.homepage;
+  entry.description=repo.description||item.fallbackDescription;
+  toSave.push(entry);
+ }
+ await upsert(toSave);
+ console.log(`Saved ${toSave.length} featured original repositories`);
+}
+await syncFeaturedOriginals();
+
 const recent=Date.now()/3600000|0;
 const sort=recent%2===0?"stars":"updated";
 const collected=new Map();
