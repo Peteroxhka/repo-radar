@@ -1023,6 +1023,30 @@ let selectedChatFile=null;
 function clearFileSelection(){
  selectedChatFile=null;clearSelectedFile();
 }
+$("file-input").onchange=()=>{
+ const file=$("file-input").files[0];
+ if(selectedPreviewUrl){URL.revokeObjectURL(selectedPreviewUrl);selectedPreviewUrl=null;}
+ const preview=$("file-preview");preview.replaceChildren();
+ selectedChatFile=file||null;
+ preview.classList.toggle("hidden",!file);
+ if(!file)return;
+ const kind=attachmentKind(file.name,file.type),line=document.createElement("div");
+ line.className="selected-file-line";
+ const icon=document.createElement("span");icon.textContent=attachmentIcon(kind);
+ const text=document.createElement("span");text.textContent=safeAttachmentName(file.name)+" · "+prettyBytes(file.size);
+ const remove=document.createElement("button");remove.type="button";remove.className="file-remove";
+ remove.textContent="×";remove.setAttribute("aria-label","Remove attachment");remove.onclick=clearFileSelection;
+ line.append(icon,text,remove);preview.append(line);
+ if(["image","video","audio"].includes(kind)){
+  selectedPreviewUrl=URL.createObjectURL(file);
+  const element=document.createElement(kind==="image"?"img":kind==="video"?"video":"audio");
+  element.src=selectedPreviewUrl;
+  if(kind==="image")element.alt=safeAttachmentName(file.name);
+  else{element.controls=true;element.preload="metadata";}
+  if(kind==="video")element.playsInline=true;
+  element.className="selected-file-media";preview.append(element);
+ }
+};
 // Custom in-page attachment chooser. Android/iOS still own the final native
 // file picker; the website must not claim to replace OS-level picker dialogs.
 const ATTACHMENT_ACCEPT={
@@ -1068,30 +1092,6 @@ document.addEventListener("keydown",event=>{
   event.preventDefault();closeAttachmentMenu(true);
  }
 });
-$("file-input").onchange=()=>{
- const file=$("file-input").files[0];
- if(selectedPreviewUrl){URL.revokeObjectURL(selectedPreviewUrl);selectedPreviewUrl=null;}
- const preview=$("file-preview");preview.replaceChildren();
- selectedChatFile=file||null;
- preview.classList.toggle("hidden",!file);
- if(!file)return;
- const kind=attachmentKind(file.name,file.type),line=document.createElement("div");
- line.className="selected-file-line";
- const icon=document.createElement("span");icon.textContent=attachmentIcon(kind);
- const text=document.createElement("span");text.textContent=safeAttachmentName(file.name)+" · "+prettyBytes(file.size);
- const remove=document.createElement("button");remove.type="button";remove.className="file-remove";
- remove.textContent="×";remove.setAttribute("aria-label","Remove attachment");remove.onclick=clearFileSelection;
- line.append(icon,text,remove);preview.append(line);
- if(["image","video","audio"].includes(kind)){
-  selectedPreviewUrl=URL.createObjectURL(file);
-  const element=document.createElement(kind==="image"?"img":kind==="video"?"video":"audio");
-  element.src=selectedPreviewUrl;
-  if(kind==="image")element.alt=safeAttachmentName(file.name);
-  else{element.controls=true;element.preload="metadata";}
-  if(kind==="video")element.playsInline=true;
-  element.className="selected-file-media";preview.append(element);
- }
-};
 $("message-form").onsubmit=async e=>{e.preventDefault();const peer=state.peer,user=state.user;if(!peer||!user||$("message-send").disabled)return;const message=$("message-input").value.trim();const file=selectedChatFile;if(!message&&!file)return;if(Array.from(message).length>4000){setStatus("chat-status",t("messageTooLong"),true);return;}const epoch=state.chatEpoch;const current=()=>isCurrentChat(state,epoch,user.id,peer.id);const button=$("message-send");button.disabled=true;$("message-input").disabled=true;$("file-input").disabled=true;setStatus("chat-status",t("busy"));try{
 let file_path=null,file_name=null,file_type=null,file_size=null;
 const secureSession=chatCryptoSession;
