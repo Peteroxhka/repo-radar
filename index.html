@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="Repo Radar — свежие и популярные открытые проекты GitHub по категориям.">
+  <title>Repo Radar — открытые проекты GitHub</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <header class="topbar"><span class="brand"><span class="brand-mark">R</span> Repo Radar</span><span class="top-note">Open-source discovery</span></header>
+  <main class="shell">
+    <section class="hero">
+      <p class="eyebrow">ПОПУЛЯРНОЕ И СВЕЖЕЕ НА GITHUB</p>
+      <h1>Находи проекты,<br><span>которые стоит знать.</span></h1>
+      <p class="lead">Лента обновляется каждые шесть часов. Показываем только проекты с описанием и лицензией.</p>
+    </section>
+    <section class="filters panel">
+      <div class="chips" id="categories"></div>
+      <label>Язык<select id="language"><option value="">Все языки</option></select></label>
+    </section>
+    <p class="status" id="status" role="status"></p>
+    <div class="grid" id="grid"><div class="empty">Загружаем…</div></div>
+    <footer>Repo Radar <span>·</span> Данные GitHub API</footer>
+  </main>
+</body>
+</html>
