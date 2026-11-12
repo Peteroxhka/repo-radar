@@ -6,7 +6,7 @@ GitHub open-source discovery feed + community features. A responsive static app 
 
 - Large public GitHub repository catalog, imported incrementally from GitHub's official public-repositories endpoint
 - Discovery feed refreshed with popular, recently active projects every six hours
-- Responsive catalog with server-side search, language/category filters, and pagination
+- Responsive catalog with server-side search, language/category filters, infinite scrolling, and manual pagination fallback
 - Dark, light, and cosmic themes; theme saved on the device
 - Language switcher: English, Russian, Spanish, French, German, Portuguese, Chinese, Japanese, Korean, Arabic, Hindi and Turkish. English fallback is used for untranslated strings. **Not all languages in the world are translated yet.**
 - Supabase Auth: GitHub OAuth or email/password signup, email confirmation, account sign-out
