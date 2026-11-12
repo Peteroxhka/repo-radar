@@ -2,26 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
-import {mergeMessages,isCurrentChat} from '../lib/core.mjs';
+import {mergeMessages,isCurrentChat,dmConversationFilter} from '../lib/core.mjs';
 const source=readFileSync(new URL('../app.js',import.meta.url),'utf8');
 function harness(responses){
  const nodes=new Map();const node=()=>({dataset:{},children:[],scrollHeight:500,scrollTop:400,clientHeight:100,replaceChildren(...c){this.children=c},append(...c){this.children.push(...c)}});
  const $=id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id)};
- const state={user:{id:'user'},peer:{id:'peer'},chatEpoch:1,seen:new Map(),historyMore:false,messageBusy:false};
+ const state={user:{id:'11111111-1111-4111-8111-111111111111'},peer:{id:'22222222-2222-4222-8222-222222222222'},chatEpoch:1,seen:new Map(),historyMore:false,messageBusy:false};
  const queries=[];
  const sb={from(){const calls=[];queries.push(calls);const q={};for(const name of ['select','or','order'])q[name]=(...args)=>{calls.push([name,...args]);return q};q.limit=()=>{const next=responses.shift();return typeof next==='function'?next():Promise.resolve({data:next,error:null})};return q;}};
- const ctx=vm.createContext({state,sb,$,document:{createDocumentFragment:node,createElement:node},mergeMessages,isCurrentChat,locale:'en',setStatus(){},safeErr:e=>e.message,console});
+ const ctx=vm.createContext({state,sb,$,document:{createDocumentFragment:node,createElement:node},mergeMessages,isCurrentChat,dmConversationFilter,locale:'en',setStatus(){},safeErr:e=>e.message,console});
  vm.runInContext(source.slice(source.indexOf('async function loadMessages('),source.indexOf('$("file-input").onchange')),ctx);
  return {ctx,state,nodes,queries};
 }
-const rows=(start,end)=>Array.from({length:end-start},(_,i)=>({id:String(end-i-1).padStart(4,'0'),created_at:'2026-11-12T12:00:00Z',sender_id:'user',content:'message'}));
+const rows=(start,end)=>Array.from({length:end-start},(_,i)=>({id:`00000000-0000-4000-8000-${String(end-i-1).padStart(12,'0')}`,created_at:'2026-11-12T12:00:00Z',sender_id:'11111111-1111-4111-8111-111111111111',content:'message'}));
 test('actual chat loader pages past 100 and preserves history on refresh',async()=>{
  const h=harness([rows(130,230),rows(30,130),rows(0,30),rows(230,231)]);
  await h.ctx.loadMessages();assert.equal(h.state.seen.size,100);assert.equal(h.state.historyMore,true);
  await h.ctx.loadMessages(true);assert.equal(h.state.seen.size,200);
  await h.ctx.loadMessages(true);assert.equal(h.state.seen.size,230);assert.equal(h.state.historyMore,false);
- await h.ctx.loadMessages();assert.equal(h.state.seen.size,231);assert.equal(h.state.seen.has('0000'),true);
- assert.ok(h.queries[1].some(q=>q[0]==='or'&&q[1].includes('id.lt.0130')));
+ await h.ctx.loadMessages();assert.equal(h.state.seen.size,231);assert.equal(h.state.seen.has('00000000-0000-4000-8000-000000000000'),true);
+ assert.ok(h.queries[1].some(q=>q[0]==='or'&&q[1].includes('id.lt.')));
+ for(const calls of h.queries)assert.equal(calls.filter(q=>q[0]==='or').length,1,'only one PostgREST or parameter per query');
 });
 test('actual chat loader catches up more than 100 unseen messages',async()=>{
  const h=harness([rows(0,1),rows(151,251),rows(51,151),rows(1,51)]);

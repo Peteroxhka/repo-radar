@@ -56,3 +56,10 @@ The browser can only read repository rows. The importer uses the service role fo
 - Run `node --test tests/*.test.mjs` and `node --input-type=module --check < app.js`. The Pages workflow runs these checks before deploying.
 
 For an existing deployment, apply the bootstrap if needed, the corrected private-trigger script, and the new chat-reliability SQL in the Supabase SQL Editor. A GitHub push deploys the frontend only; it does not apply database SQL. Verify with two authenticated accounts plus a third account for access isolation.
+
+## 2026-11-14 reliability / upload security patch
+
+Apply `supabase/migrations/20261114_storage_hardening.sql` after the chat reliability script.
+It changes Storage RLS and removes the unrestricted `application/octet-stream` upload type without removing existing user files. Uploads still support documents, photos, audio, video and archives with known MIME types. Receivers can only read files referenced by messages sent to them. Existing files owned by senders remain accessible to their senders. This is not malware scanning; public deployments need scanning, rate limits and abuse reporting.
+
+The chat UI now uses exactly **one PostgREST OR filter per message query**, ensuring the sender/recipient pair is never lost when cursor pagination is applied. OAuth errors returned as query/hash parameters appear in the login dialog instead of an unexplained home page. New tests cover these cases. GitHub OAuth still requires the provider and signup permissions to be enabled in Supabase Auth settings.

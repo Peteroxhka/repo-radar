@@ -1,4 +1,4 @@
-import {normalizeSearch, mergeMessages, isCurrentChat} from "./lib/core.mjs";
+import {normalizeSearch, mergeMessages, isCurrentChat, dmConversationFilter, attachmentMime} from "./lib/core.mjs";
 import {createClient} from "https://esm.sh/@supabase/supabase-js@2.57.0";
 import {SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, DATABASE_SCHEMA} from "./config.js";
 const sb=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{db:{schema:DATABASE_SCHEMA},auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
@@ -107,7 +107,19 @@ if(tab==="messages"&&state.user)loadContacts();
 }
 $("tab-discover").onclick=()=>showTab("discover");$("tab-messages").onclick=()=>showTab("messages");$("tab-ps4").onclick=()=>showTab("ps4");
 $("ps4-catalog-search").onclick=()=>{state.category="all";state.language="";state.search="ps4";$("repo-search").value="ps4";$("language").value="";renderCategories();showTab("discover");loadRepos(true);};
-function openDialog(id){$(id).showModal();}document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.close).close());
+function openDialog(id){if(!$(id).open)$(id).showModal();}document.querySelectorAll("[data-close]").forEach(b=>b.onclick=()=>$(b.dataset.close).close());
+// OAuth provider failures are returned through query/hash parameters. Display
+// the explanation instead of silently landing on an unauthenticated home page.
+function reportOAuthRedirectError(){
+  const url=new URL(location.href);
+  const hash=new URLSearchParams(url.hash.startsWith("#")?url.hash.slice(1):"");
+  const kind=url.searchParams.get("error")||hash.get("error");
+  if(!kind)return;
+  const message=url.searchParams.get("error_description")||hash.get("error_description")||kind;
+  setRegister(false);openDialog("auth-dialog");setStatus("auth-status",message,true);
+  for(const key of ["error","error_code","error_description"]){url.searchParams.delete(key);hash.delete(key);}
+  url.hash=hash.toString()?hash.toString():"";history.replaceState(null,"",url.href);
+}
 function setRegister(enabled){state.register=enabled;$("username-label").classList.toggle("hidden",!enabled);$("auth-username").required=enabled;$("auth-password").autocomplete=enabled?"new-password":"current-password";localized();}
 $("auth-open").onclick=()=>{setRegister(false);openDialog("auth-dialog");};$("chat-login").onclick=()=>$("auth-open").click();
 $("auth-switch").onclick=()=>{setRegister(!state.register);setStatus("auth-status","");};
@@ -188,17 +200,17 @@ const userId=state.user?.id,peerId=state.peer?.id,epoch=state.chatEpoch;
 if(!userId||!peerId||state.messageBusy||(older&&!state.historyMore))return;
 const current=()=>isCurrentChat(state,epoch,userId,peerId);state.messageBusy=true;$("chat-history").disabled=true;
 try{
-let q=sb.from("direct_messages").select("id,sender_id,recipient_id,content,file_path,file_name,file_type,file_size,created_at").or("and(sender_id.eq."+userId+",recipient_id.eq."+peerId+"),and(sender_id.eq."+peerId+",recipient_id.eq."+userId+")").order("created_at",{ascending:false}).order("id",{ascending:false});
 const first=state.seen.size===0;
-if(older&&state.historyCursor){const c=state.historyCursor;q=q.or(`created_at.lt.${c.created_at},and(created_at.eq.${c.created_at},id.lt.${c.id})`);}
-else if(!first){const latest=Array.from(state.seen.values()).at(-1);q=q.or(`created_at.gt.${latest.created_at},and(created_at.eq.${latest.created_at},id.gt.${latest.id})`);}
+const latest=!first?Array.from(state.seen.values()).at(-1):null;
+const before=older?state.historyCursor:null;
+let q=sb.from("direct_messages").select("id,sender_id,recipient_id,content,file_path,file_name,file_type,file_size,created_at").or(dmConversationFilter(userId,peerId,older?null:latest,before)).order("created_at",{ascending:false}).order("id",{ascending:false});
 const {data,error}=await q.limit(100);if(!current())return;if(error)throw error;
 let page=data||[];
 // Catch up all unseen messages after a suspended tab, without gaps over 100 rows.
 if(!older&&!first&&page.length===100){
-const latest=Array.from(state.seen.values()).at(-1);let tail=page.at(-1);
+let tail=page.at(-1);
 while(true){
-const {data:batch,error:batchError}=await sb.from("direct_messages").select("id,sender_id,recipient_id,content,file_path,file_name,file_type,file_size,created_at").or("and(sender_id.eq."+userId+",recipient_id.eq."+peerId+"),and(sender_id.eq."+peerId+",recipient_id.eq."+userId+")").or(`created_at.gt.${latest.created_at},and(created_at.eq.${latest.created_at},id.gt.${latest.id})`).or(`created_at.lt.${tail.created_at},and(created_at.eq.${tail.created_at},id.lt.${tail.id})`).order("created_at",{ascending:false}).order("id",{ascending:false}).limit(100);
+const {data:batch,error:batchError}=await sb.from("direct_messages").select("id,sender_id,recipient_id,content,file_path,file_name,file_type,file_size,created_at").or(dmConversationFilter(userId,peerId,latest,tail)).order("created_at",{ascending:false}).order("id",{ascending:false}).limit(100);
 if(!current())return;if(batchError)throw batchError;page.push(...(batch||[]));if((batch||[]).length<100)break;tail=batch.at(-1);
 }}
 if(first||older){state.historyCursor=page.at(-1)||state.historyCursor;state.historyMore=page.length===100;}
@@ -220,12 +232,12 @@ $("file-input").onchange=()=>{const file=$("file-input").files[0];setStatus("fil
 $("message-form").onsubmit=async e=>{e.preventDefault();const peer=state.peer,user=state.user;if(!peer||!user||$("message-send").disabled)return;const message=$("message-input").value.trim();const file=$("file-input").files[0];if(!message&&!file)return;if(Array.from(message).length>4000){setStatus("chat-status",t("messageTooLong"),true);return;}const epoch=state.chatEpoch;const current=()=>isCurrentChat(state,epoch,user.id,peer.id);const button=$("message-send");button.disabled=true;$("message-input").disabled=true;$("file-input").disabled=true;setStatus("chat-status",t("busy"));try{
 let file_path=null,file_name=null,file_type=null,file_size=null;
 if(file){if(file.size>25*1024*1024)throw Error(t("fileTooLarge"));const ext=file.name.split(".").pop()?.toLowerCase();if(!allowedExt.has(ext)||blockedMime.test(file.type||""))throw Error(t("unsupportedFile"));
-file_name=file.name.slice(0,180);file_type=file.type||"application/octet-stream";file_size=file.size;
+file_name=file.name.slice(0,180);file_type=attachmentMime(file.name,file.type);if(!file_type)throw Error(t("unsupportedFile"));file_size=file.size;
 file_path=user.id+"/"+peer.id+"/"+crypto.randomUUID()+"."+ext;const{error:uploadError}=await sb.storage.from("repo-radar-dm").upload(file_path,file,{contentType:file_type,upsert:false});if(uploadError)throw uploadError;}
 const {error}=await sb.from("direct_messages").insert({sender_id:user.id,recipient_id:peer.id,content:message,file_path,file_name,file_type,file_size});
 if(error){if(file_path){const cleanup=await sb.storage.from("repo-radar-dm").remove([file_path]);if(cleanup.error||!cleanup.data?.length)throw Error(t("cleanupFailed"));}throw error;}
 if(!current())return;setStatus("chat-status","");
 $("message-input").value="";$("file-input").value="";setStatus("file-preview","");await loadMessages();await loadContacts();
 }catch(err){if(current())setStatus("chat-status",safeErr(err),true);}finally{if(current()){button.disabled=false;$("message-input").disabled=false;$("file-input").disabled=false;}}};
-localized();onSession().catch(e=>console.error(e));loadRepos();
+localized();reportOAuthRedirectError();onSession().catch(e=>console.error(e));loadRepos();
 
