@@ -29,6 +29,9 @@ jobs:
           node --check lib/catalog.mjs
           node --check lib/console-filters.mjs
           node --check lib/official-info.mjs
+          node --check lib/chat-crypto.mjs
+          node --check lib/attachment-ui.mjs
+          node --check lib/curated-descriptions.mjs
           node --check scripts/stamp-build.mjs
           node --check unsupported-browser.js
           node --check scripts/collect.mjs

@@ -59,7 +59,20 @@
 - Авторизация по электронной почте и через GitHub OAuth с помощью Supabase Auth.
 - Профили, аватары, личные сообщения и ограниченная загрузка файлов.
 
-Личные сообщения защищаются политиками доступа Supabase. Они **не являются сквозным шифрованием (E2EE)**.
+Обычные сообщения защищены политиками доступа Supabase (RLS), но **не имеют сквозного шифрования**. Для новых сообщений и файлов доступен **добровольный E2EE по общему секрету**.
+
+### Шифрование сообщений и файлов
+
+1. Откройте переписку и нажмите **«Шифрование»**.
+2. Создайте надёжный общий секрет (от 12 символов) и передайте собеседнику **вне этого чата**.
+3. Оба пользователя вводят одинаковый секрет. Ключ выводится в браузере с помощью **PBKDF2 / SHA-256, 240 000 итераций**, а новые сообщения и файлы шифруются **AES-256-GCM** со случайным nonce.
+4. Секрет не сохраняется в браузере или Supabase: после обновления страницы либо перехода на другое устройство его нужно снова ввести. Потеря секрета означает невозможность восстановить зашифрованную переписку.
+
+**Ограничения:** зашифрованные файлы до 15 МБ, текст примерно до 2600 символов (или меньше для многобайтовых символов). Старые сообщения остаются незашифрованными. Имена, размеры и MIME-типы файлов, участники переписки и время сообщений остаются видимыми серверу. Общий секрет не подтверждает личность собеседника; проверка безопасности независимыми аудиторами не проводилась. Приложение не следует считать полноценным защищённым мессенджером.
+
+### Просмотр вложений
+
+Изображения и поддерживаемые видео и аудиофайлы отображаются **непосредственно в переписке** с обычными браузерными элементами просмотра. Для PDF, документов и архивов предусмотрена карточка с оригинальным именем файла, размером и кнопкой открытия. Файлы остаются в закрытом Supabase Storage, доступ к ним выдаётся через короткоживущие подписанные ссылки. Зашифрованные файлы расшифровываются локально в браузере.
 
 ### Административная панель
 
@@ -166,7 +179,20 @@ Repo Radar itself has editorial long-form descriptions in both languages. For th
 - Email/password and GitHub OAuth sign-in through Supabase Auth.
 - Profiles, avatars, direct messages, and restricted attachment uploads.
 
-Direct messages use Supabase access controls; **they are not end-to-end encrypted**.
+Ordinary direct messages are protected by Supabase RLS but **are not end-to-end encrypted**. An **optional shared-secret E2EE mode** protects **new** messages and attachments.
+
+### Message and attachment encryption
+
+1. Select a contact and open **Encryption**.
+2. Choose a strong shared secret (at least 12 characters) and exchange it **outside the chat**.
+3. Both people enter the same secret. The browser derives the key with **PBKDF2 / SHA-256 (240,000 iterations)** and encrypts new messages and files using **AES-256-GCM** and a fresh random nonce.
+4. Keys and secrets are held **only in browser memory**, not localStorage or Supabase. Re-enter the secret on every device or after a reload. There is no recovery if it is lost.
+
+**Limits and caveats:** encrypted files are limited to 15 MB and text to approximately 2,600 characters (fewer for multibyte Unicode). Earlier messages remain plaintext. The server still sees sender/recipient IDs, timestamps, original filenames, MIME types, and file sizes. Shared secrets do not independently authenticate the other person; the implementation has not undergone independent security auditing. Do not treat this prototype as a fully audited secure messenger.
+
+### Native attachment previews
+
+Images appear as inline previews, video and audio play using browser controls, and PDFs, archives, and documents use a card showing the original filename, file size, and an open action. Existing files remain in a private Supabase Storage bucket with temporary signed URLs. Encrypted files are decrypted locally before being displayed or downloaded.
 
 ### Owner-only administration
 

@@ -103,34 +103,41 @@
     </section>
 
 <section id="view-messages" class="hidden">
-      <div class="section-heading messages-heading"><div><p class="section-kicker" data-i18n="community">СООБЩЕСТВО</p><h1 data-i18n="yourMessages">Личные сообщения</h1><p class="lead compact" data-i18n="messagesIntro">Общайся и делись файлами. Без звонков.</p></div></div>
-      <div id="chat-guest" class="empty large"><h2 data-i18n="joinConversation">Присоединяйся к общению</h2><p data-i18n="loginToChat">Войди или зарегистрируйся, чтобы писать другим пользователям.</p><button class="button button-primary" id="chat-login" data-i18n="signIn">Войти</button></div>
-      <div id="chat-app" class="chat-layout hidden">
-        <aside class="chat-sidebar">
-          <h2 data-i18n="conversations">Диалоги</h2>
-          <label class="sr-only" for="user-search" data-i18n="findUser">Найти пользователя</label>
-          <input id="user-search" type="search" autocomplete="off" placeholder="Никнейм пользователя...">
-          <button id="find-user" class="button button-primary full" data-i18n="startChat">Начать диалог</button>
-          <p class="hint" id="find-status"></p>
-          <div id="conversation-list" class="conversation-list"></div>
-        </aside>
-        <div class="chat-panel">
-          <div class="chat-partner" id="chat-partner" data-i18n="chooseChat">Выбери собеседника</div>
-          <button id="chat-history" class="button button-outline" type="button" data-i18n="olderMessages" hidden>Предыдущие сообщения</button>
-          <div class="chat-messages" id="chat-messages" aria-live="polite"><div class="empty" data-i18n="chooseChat">Выбери собеседника</div></div>
-          <form id="message-form" class="message-form">
-            <input id="file-input" class="sr-only" type="file" accept="image/*,video/*,audio/*,.pdf,.txt,.md,.csv,.json,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.zip,.7z,.rar">
-            <label for="file-input" class="attach-btn" title="Attach file" aria-label="Attach file">＋</label>
-            <input id="message-input" type="text" maxlength="4000" autocomplete="off" placeholder="Написать сообщение..." disabled>
-            <button id="message-send" class="button button-primary" type="submit" disabled data-i18n="send">Отправить</button>
-          </form>
-          <p id="file-preview" class="hint file-preview"></p>
-          <p class="hint small-note" data-i18n="attachmentLimit">Вложения до 25 МБ, без исполняемых файлов.</p>
-          <p id="chat-status" class="hint" role="status"></p>
-        </div>
-      </div>
-    </section>
-    <section id="view-admin" class="hidden admin-section">
+ <div class="section-heading messages-heading"><div><p class="section-kicker" data-i18n="community">COMMUNITY</p><h1 data-i18n="yourMessages">Direct messages</h1><p class="lead compact" data-i18n="messagesIntro">Chat with developers and share files.</p></div></div>
+ <div id="chat-guest" class="empty large"><h2 data-i18n="joinConversation">Join the conversation</h2><p data-i18n="loginToChat">Sign in to send direct messages.</p><button class="button button-primary" id="chat-login" type="button" data-i18n="signIn">Sign in</button></div>
+ <div id="chat-app" class="chat-layout chat-modern hidden">
+  <aside class="chat-sidebar">
+   <div class="chat-sidebar-head"><div><small data-i18n="chatInbox">YOUR INBOX</small><h2 data-i18n="conversations">Conversations</h2></div><span aria-hidden="true">✦</span></div>
+   <div class="chat-user-search"><label class="sr-only" for="user-search" data-i18n="findUser">Find user</label><span aria-hidden="true">⌕</span><input id="user-search" type="search" autocomplete="off" placeholder="Username..."></div>
+   <button id="find-user" class="button button-primary full" type="button" data-i18n="startChat">Start chat</button><p class="hint" id="find-status" role="status"></p>
+   <div id="conversation-list" class="conversation-list"></div><p class="hint chat-sidebar-foot" data-i18n="chatPrivacySidebar">Private conversations visible to participants only.</p>
+  </aside>
+  <div class="chat-panel">
+   <div class="chat-partner-bar">
+    <button id="chat-back" class="chat-back" type="button" aria-label="Back to conversations">‹</button>
+    <span id="chat-peer-avatar" class="chat-peer-avatar" aria-hidden="true">?</span>
+    <div class="chat-partner-information"><strong class="chat-partner" id="chat-partner" data-i18n="chooseChat">Choose a conversation</strong><span id="chat-security-label" class="chat-security-label" data-i18n="chatRlsSecurity">Private storage · No E2EE</span></div>
+    <button id="chat-encryption-toggle" class="chat-security-button" type="button" aria-controls="chat-encryption-panel" aria-expanded="false" disabled><span aria-hidden="true">♧</span> <span data-i18n="chatEncryptionSettings">Encryption</span></button>
+   </div>
+   <div id="chat-encryption-panel" class="chat-encryption-panel hidden">
+    <h3 data-i18n="chatEnableEncryption">End-to-end encryption with a shared secret</h3>
+    <p class="hint" data-i18n="chatEncryptionWarning">Share a strong secret outside this chat. Both people must enter it on each device. Lost secrets cannot be recovered; metadata is still visible.</p>
+    <div class="chat-key-controls"><label class="sr-only" for="chat-secret">Shared secret</label><input id="chat-secret" type="password" minlength="12" maxlength="512" autocomplete="new-password" placeholder="Shared secret (12+ characters)"><button id="chat-secret-enable" type="button" class="button button-primary" data-i18n="chatActivateEncryption">Enable</button><button id="chat-secret-clear" type="button" class="button button-outline" data-i18n="chatClearEncryption">Disable</button></div><p id="chat-secret-status" class="hint" role="status"></p>
+   </div>
+   <button id="chat-history" class="button button-outline chat-history-button" type="button" data-i18n="olderMessages" hidden>Older messages</button>
+   <div class="chat-messages" id="chat-messages" aria-live="polite"><div class="chat-welcome"><span aria-hidden="true">✧</span><h3 data-i18n="chooseChat">Choose a conversation</h3><p data-i18n="chatWelcomeHint">Select a contact to begin.</p></div></div>
+   <div id="file-preview" class="chat-file-preview hidden"></div>
+   <form id="message-form" class="message-form">
+    <input id="file-input" class="sr-only" type="file" accept="image/*,video/*,audio/*,.pdf,.txt,.md,.csv,.json,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.zip,.7z,.rar">
+    <label for="file-input" class="attach-btn" title="Attach file" aria-label="Attach file">＋</label>
+    <textarea id="message-input" rows="1" maxlength="4000" autocomplete="off" placeholder="Write a message..." disabled></textarea>
+    <button id="message-send" class="button button-primary" type="submit" disabled data-i18n="send">Send</button>
+   </form>
+   <p class="hint small-note" data-i18n="attachmentLimit">Attachments up to 25 MB, executables blocked.</p><p id="chat-status" class="hint" role="status"></p>
+  </div>
+ </div>
+</section>
+<section id="view-admin" class="hidden admin-section">
       <div class="section-heading messages-heading">
         <div><p class="section-kicker">PRIVATE MANAGEMENT</p>
           <h1 data-i18n="adminPanel">Admin panel</h1>

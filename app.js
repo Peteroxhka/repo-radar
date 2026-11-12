@@ -2,6 +2,9 @@ import {normalizeSearch, mergeMessages, isCurrentChat, dmConversationFilter, att
 import {createClient} from "https://esm.sh/@supabase/supabase-js@2.57.0";
 import {trustedGitHubPagesSite} from "./lib/catalog.mjs";
 import {officialText} from "./lib/official-info.mjs";
+import {curatedDescription} from "./lib/curated-descriptions.mjs";
+import {attachmentKind,attachmentIcon,prettyBytes,safeAttachmentName,isPrivateStorageUrl} from "./lib/attachment-ui.mjs";
+import {deriveConversationKey,encryptMessage,decryptMessage,encryptFile,decryptFile,isEncryptedText,isEncryptedAttachment,ENCRYPTED_FILE_MAX_BYTES,ENCRYPTED_TEXT_MAX_CHARS} from "./lib/chat-crypto.mjs";
 import {consoleMetadata,filterConsoleProjects,sortConsoleProjects,consoleFacetOptions} from "./lib/console-filters.mjs";
 import {SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, DATABASE_SCHEMA} from "./config.js";
 const sb=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{db:{schema:DATABASE_SCHEMA},auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
@@ -146,15 +149,59 @@ function getProjectImage(repo){
 }
 function getDescriptions(repo){
  if(repo.full_name?.toLowerCase()==="peteroxhka/repo-radar")return projectLongDescription;
+ const curated=curatedDescription(repo.full_name);if(curated)return curated;
  const original=String(repo.description||"").trim()||t("noDescription");
- const ru=String(repo.description_ru||"").trim();
- const en=String(repo.description_en||"").trim();
+ const ru=String(repo.description_ru||"").trim(),en=String(repo.description_en||"").trim();
  const containsRussian=/[а-яё]/i.test(original);
  return {
-  ru:ru|| (containsRussian?original:t("descriptionUntranslatedRu")+original),
-  en:en|| (!containsRussian?original:t("descriptionUntranslatedEn")+original)
+  ru:ru||(containsRussian?original:t("translationNotAvailableRu")),
+  en:en||(!containsRussian?original:t("translationNotAvailableEn"))
  };
 }
+
+
+Object.assign(translations.ru,{
+ translationNotAvailableRu:"Проверенный перевод на русский пока не подготовлен. Оригинальное описание автора можно прочитать во вкладке English.",
+ translationNotAvailableEn:"An English translation is not yet available. The original author description is shown in the Russian tab.",
+ chatInbox:"ВХОДЯЩИЕ",chatPrivacySidebar:"Диалоги доступны только участникам.",
+ chatWelcomeHint:"Выбери собеседника слева или начни новый диалог.",
+ chatRlsSecurity:"Приватный чат · без сквозного шифрования",
+ chatE2eeSecurity:"Новые сообщения и файлы · AES-256-GCM (старые могут быть без шифрования)",
+ chatEncryptionSettings:"Шифрование",chatEnableEncryption:"Шифрование с общим секретом",
+ chatEncryptionWarning:"Передай надёжный секрет собеседнику вне этого чата. Оба должны ввести одинаковый секрет на каждом устройстве. При потере восстановить сообщения невозможно. Имена файлов и метаданные остаются видны серверу.",
+ chatActivateEncryption:"Включить",chatClearEncryption:"Выключить",chatSecretReady:"Шифрование включено для новых сообщений и файлов. Секрет хранится только до закрытия страницы.",
+ chatSecretCleared:"Шифрование выключено для новых сообщений. Старые зашифрованные сообщения требуют прежнего секрета.",
+ chatSecretTooShort:"Используй минимум 12 символов. Передай секрет собеседнику другим способом.",
+ chatEncryptedLocked:"🔒 Сообщение зашифровано. Для просмотра введи общий секрет.",
+ chatDecryptFailed:"🔒 Не удалось расшифровать: проверь общий секрет.",
+ chatAttachmentLocked:"Зашифрованный файл — введи общий секрет.",
+ chatAttachmentOpen:"Открыть файл",chatAttachmentDownload:"Скачать",chatAttachmentPreview:"Просмотреть",
+ chatAttachmentLoading:"Загружаем файл...",chatAttachmentError:"Не удалось открыть вложение.",
+ chatChatBack:"К списку диалогов",chatEncryptionActiveNote:"Зашифрованные файлы ограничены 15 МБ. Метаданные не скрыты.",
+ chatE2eeTextTooLong:"Зашифрованный текст должен быть короче 2600 символов.",
+ chatEncryptionLostSecret:"Без общего секрета старые зашифрованные сообщения нельзя восстановить."
+});
+Object.assign(translations.en,{
+ translationNotAvailableRu:"A verified Russian translation is not available yet. Read the author's original description in the English tab.",
+ translationNotAvailableEn:"An English translation is not available yet. Read the author's original description in the Russian tab.",
+ chatInbox:"INBOX",chatPrivacySidebar:"Conversations are visible only to participants.",
+ chatWelcomeHint:"Choose a contact on the left or start a conversation.",
+ chatRlsSecurity:"Private chat · not end-to-end encrypted",
+ chatE2eeSecurity:"New messages and files · AES-256-GCM (older ones may be plaintext)",
+ chatEncryptionSettings:"Encryption",chatEnableEncryption:"Encryption with a shared secret",
+ chatEncryptionWarning:"Share a strong secret outside this chat. Both participants must enter the same secret on each device. Lost secrets mean lost access. File names and metadata remain visible to the server.",
+ chatActivateEncryption:"Enable",chatClearEncryption:"Disable",chatSecretReady:"Encryption enabled for new messages and files. This key is kept in memory only.",
+ chatSecretCleared:"Encryption disabled for new messages. Previous encrypted messages still need the old secret.",
+ chatSecretTooShort:"Use a strong secret of at least 12 characters and share it outside this chat.",
+ chatEncryptedLocked:"🔒 Encrypted message. Enter your shared secret to read it.",
+ chatDecryptFailed:"🔒 Unable to decrypt. Check your shared secret.",
+ chatAttachmentLocked:"Encrypted file — enter the shared secret.",
+ chatAttachmentOpen:"Open file",chatAttachmentDownload:"Download",chatAttachmentPreview:"Preview",
+ chatAttachmentLoading:"Loading attachment...",chatAttachmentError:"Could not open attachment.",
+ chatChatBack:"Back to conversations",chatEncryptionActiveNote:"Encrypted files are limited to 15 MB. Metadata remains visible.",
+ chatE2eeTextTooLong:"Encrypted text must be shorter than 2600 characters.",
+ chatEncryptionLostSecret:"Encrypted messages cannot be recovered without the shared secret."
+});
 
 const categoryKeys=["all","programming","tools","ai","data","web","learning","games","console_webkit","other"];
 const localeNames={ru:"Русский",en:"English",es:"Español",fr:"Français",de:"Deutsch",pt:"Português",zh:"中文",ja:"日本語",ko:"한국어",ar:"العربية",hi:"हिन्दी",tr:"Türkçe"};
@@ -166,6 +213,27 @@ if(!translations[locale])locale="en";
 let theme=localStorage.getItem("radar-theme")||"dark";if(!["dark","light","cosmic"].includes(theme))theme="dark";
 let state={chatEpoch:0,messageBusy:false,historyCursor:null,historyMore:false,contactRequest:0,category:"all",language:"",search:"",sort:"popular",includeDescription:false,consoleFilters:{console:"",version:"",firmwareVersion:"",firmwareType:""},consoleRows:null,user:null,profile:null,peer:null,allRows:[],totalCount:0,catalogTotal:0,categoryCounts:{},categoryCountsLoaded:false,hasMore:true,loading:false,languageOptions:[],languageOptionsLoaded:false,listRequestId:0,searchTimer:null,seen:new Map(),sub:null,refreshTimer:null,register:false,adminAuthorized:false};
 let adminAccessEpoch=0,detailRequestEpoch=0;
+let chatCryptoSession=null;
+const chatUrlCache=new Map();
+let mediaObserver=null;
+const chatObjectUrls=new Set();
+function revokeChatMedia(){
+ for(const url of chatObjectUrls)URL.revokeObjectURL(url);
+ chatObjectUrls.clear();
+}
+let selectedPreviewUrl=null;
+function clearSelectedFile(){
+ if(selectedPreviewUrl){URL.revokeObjectURL(selectedPreviewUrl);selectedPreviewUrl=null;}
+ $("file-preview").replaceChildren();$("file-preview").classList.add("hidden");
+ $("file-input").value="";
+}
+function updateChatSecurity(){
+ const encrypted=!!chatCryptoSession&&!!state.peer;
+ $("chat-security-label").textContent=t(encrypted?"chatE2eeSecurity":"chatRlsSecurity");
+ $("chat-security-label").classList.toggle("is-encrypted",encrypted);
+ $("chat-encryption-toggle").classList.toggle("is-encrypted",encrypted);
+ $("chat-encryption-toggle").disabled=!state.peer;
+}
 Object.assign(translations.ru,{sort:"Сортировка",sortPopular:"Самые популярные ★",sortLeast:"Меньше звёзд",sortRecent:"Недавно обновлённые",sortNewest:"Новые проекты",sortForked:"Чаще копируют",searchDescription:"Искать также в описаниях",ps4Website:"Открыть сайт"});
 Object.assign(translations.en,{sort:"Sort",sortPopular:"Most starred ★",sortLeast:"Least starred",sortRecent:"Recently updated",sortNewest:"Newest repositories",sortForked:"Most forked",searchDescription:"Also search descriptions",ps4Website:"Open website"});
 const categoryLabels={ru:"Без категории",en:"Unclassified",es:"Sin categoría",fr:"Sans catégorie",de:"Nicht kategorisiert",pt:"Sem categoria",zh:"未分类",ja:"未分類",ko:"미분류",ar:"غير مصنف",hi:"अवर्गीकृत",tr:"Kategorisiz"};
@@ -654,7 +722,18 @@ let image=state.profile.avatar_url;const file=$("avatar-file").files[0];
 if(file&&!githubAccount()){if(file.size>5*1024*1024||!["image/jpeg","image/png","image/webp","image/gif"].includes(file.type))throw Error(t("unsupportedFile"));const ext=file.type.split("/")[1]==="jpeg"?"jpg":file.type.split("/")[1];const path=state.user.id+"/"+generateUUID()+"."+ext;const {error:upErr}=await sb.storage.from("repo-radar-avatars").upload(path,file,{contentType:file.type,upsert:false});if(upErr)throw upErr;const{data}=sb.storage.from("repo-radar-avatars").getPublicUrl(path);image=data.publicUrl;}
 const{error}=await sb.from("profiles").update({username:name,avatar_url:image}).eq("id",state.user.id);if(error)throw error;await fetchProfile();$("avatar-file").value="";setStatus("profile-status",t("saved"));}catch(err){setStatus("profile-status",safeErr(err),true);}finally{button.disabled=false;}};
 $("signout").onclick=async()=>{const{error}=await sb.auth.signOut();if(error){setStatus("profile-status",safeErr(error),true);return;}closeDialog("profile-dialog");};
-function stopChat(){setStatus("chat-status","");$("file-input").disabled=true;state.chatEpoch+=1;state.contactRequest+=1;state.messageBusy=false;state.historyCursor=null;state.historyMore=false;$("chat-history").hidden=true;$("message-input").value="";$("file-input").value="";setStatus("file-preview","");delete $("chat-messages").dataset.lastId;if(state.sub){sb.removeChannel(state.sub);state.sub=null;}if(state.refreshTimer){clearInterval(state.refreshTimer);state.refreshTimer=null;}state.peer=null;state.seen.clear();$("chat-messages").replaceChildren();$("conversation-list").replaceChildren();$("chat-partner").textContent=t("chooseChat");$("message-input").disabled=true;$("message-send").disabled=true;}
+function stopChat(){
+ chatCryptoSession=null;
+ chatUrlCache.clear();if(mediaObserver){mediaObserver.disconnect();mediaObserver=null;}
+ revokeChatMedia();if(selectedPreviewUrl){URL.revokeObjectURL(selectedPreviewUrl);selectedPreviewUrl=null;}
+ $("chat-secret").value="";setStatus("chat-secret-status","");
+ $("chat-encryption-panel").classList.add("hidden");
+ $("chat-encryption-toggle").setAttribute("aria-expanded","false");
+ $("chat-app").classList.remove("has-peer");
+ $("chat-peer-avatar").replaceChildren("?");state.lastRenderedSignature=null;
+ updateChatSecurity();
+ setStatus("chat-status","");$("file-input").disabled=true;state.chatEpoch+=1;state.contactRequest+=1;state.messageBusy=false;state.historyCursor=null;state.historyMore=false;$("chat-history").hidden=true;$("message-input").value="";$("file-input").value="";clearFileSelection();
+ delete $("chat-messages").dataset.lastId;if(state.sub){sb.removeChannel(state.sub);state.sub=null;}if(state.refreshTimer){clearInterval(state.refreshTimer);state.refreshTimer=null;}state.peer=null;state.seen.clear();$("chat-messages").replaceChildren();$("conversation-list").replaceChildren();$("chat-partner").textContent=t("chooseChat");$("message-input").disabled=true;$("message-send").disabled=true;}
 async function onSession(){const{data:{user}}=await sb.auth.getUser();const previous=state.user?.id;state.user=user||null;if(previous&&previous!==user?.id)stopChat();if(!user)stopChat();
 $("auth-open").classList.toggle("hidden",!!user);$("profile-open").classList.toggle("hidden",!user);$("chat-guest").classList.toggle("hidden",!!user);$("chat-app").classList.toggle("hidden",!user);
 if(user){
@@ -693,20 +772,203 @@ ids.push(...(data||[]).map(row=>row.peer_id));if((data||[]).length<100)break;off
 if(state.peer&&!ids.includes(state.peer.id))ids.unshift(state.peer.id);
 const people=new Map();for(let i=0;i<ids.length;i+=100){for(const [id,p] of await findUsersById(ids.slice(i,i+100)))people.set(id,p);if(!current())return;}
 $("conversation-list").replaceChildren(...ids.filter(id=>people.has(id)).map(id=>{
-const p=people.get(id),b=document.createElement("button");b.type="button";b.className="conversation"+(state.peer?.id===id?" active":"");const av=document.createElement("span");av.className="conversation-mark";av.textContent=p.username[0]?.toUpperCase()||"?";const label=document.createElement("span");label.textContent=p.username;b.append(av,label);b.onclick=()=>selectPeer(p);return b;}));
+const p=people.get(id),b=document.createElement("button");b.type="button";b.className="conversation"+(state.peer?.id===id?" active":"");const av=document.createElement("span");av.className="conversation-mark";av.textContent=p.username[0]?.toUpperCase()||"?";const label=document.createElement("span");label.textContent=p.username;
+ const caption=document.createElement("small");caption.textContent="@"+p.username;
+ const textWrap=document.createElement("span");textWrap.className="conversation-info";textWrap.append(label,caption);
+ b.append(av,textWrap);b.onclick=()=>selectPeer(p);return b;}));
 if(!ids.length)$("conversation-list").textContent=t("noChat");
 }catch(e){if(current())setStatus("find-status",safeErr(e),true);}}
 $("find-user").onclick=async()=>{if(!state.user)return;const username=$("user-search").value.trim().toLowerCase();if(!/^[a-z0-9_]{3,24}$/.test(username)){setStatus("find-status",t("userNotFound"),true);return;}try{const{data,error}=await sb.from("profiles").select("id,username,avatar_url").eq("username",username).maybeSingle();if(error)throw error;if(!data){setStatus("find-status",t("userNotFound"),true);return;}if(data.id===state.user.id){setStatus("find-status",t("sameUser"),true);return;}setStatus("find-status","");await selectPeer(data);}catch(e){setStatus("find-status",safeErr(e),true);}};
 async function selectPeer(person){
 stopChat();state.peer=person;const epoch=state.chatEpoch,userId=state.user?.id;if(!userId)return;
-$("chat-partner").textContent="@"+person.username;$("file-input").disabled=false;$("message-input").disabled=false;$("message-send").disabled=false;
+$("chat-partner").textContent="@"+person.username;
+ avatar($("chat-peer-avatar"),person.avatar_url,person.username);
+ $("chat-app").classList.add("has-peer");
+ updateChatSecurity();
+ $("file-input").disabled=false;$("message-input").disabled=false;$("message-send").disabled=false;
 const current=()=>isCurrentChat(state,epoch,userId,person.id);
 // Install resources before awaiting requests: a new selection can always clean them up.
 state.sub=sb.channel("radar-dm-"+userId+"-"+epoch).on("postgres_changes",{event:"INSERT",schema:"repo_radar",table:"direct_messages",filter:"recipient_id=eq."+userId},()=>{if(current()){loadMessages();loadContacts();}}).subscribe();
 state.refreshTimer=setInterval(()=>{if(current()){loadMessages();loadContacts();}},12000);
 await loadMessages();if(!current())return;await loadContacts();if(current())$("message-input").focus();
 }
+
+$("chat-back").onclick=()=>{$("chat-app").classList.remove("has-peer");};
+$("chat-encryption-toggle").onclick=()=>{
+ if(!state.peer)return;
+ const panel=$("chat-encryption-panel"),show=panel.classList.contains("hidden");
+ panel.classList.toggle("hidden",!show);
+ $("chat-encryption-toggle").setAttribute("aria-expanded",String(show));
+ if(show)$("chat-secret").focus();
+};
+$("chat-secret-enable").onclick=async()=>{
+ if(!state.user||!state.peer)return;
+ const passphrase=$("chat-secret").value,epoch=state.chatEpoch,peer=state.peer;
+ if(Array.from(passphrase).length<12){setStatus("chat-secret-status",t("chatSecretTooShort"),true);return;}
+ const btn=$("chat-secret-enable");btn.disabled=true;
+ try{
+  const session=await deriveConversationKey(passphrase,state.user.id,peer.id);
+  if(epoch!==state.chatEpoch||state.peer?.id!==peer.id)return;
+  chatCryptoSession=session;state.lastRenderedSignature=null;
+  chatUrlCache.clear();revokeChatMedia();
+  $("chat-secret").value="";
+  updateChatSecurity();setStatus("chat-secret-status",t("chatSecretReady"));
+  await loadMessages();
+ }catch(e){setStatus("chat-secret-status",safeErr(e),true);}
+ finally{btn.disabled=false;$("chat-secret").value="";}
+};
+$("chat-secret-clear").onclick=()=>{
+ chatCryptoSession=null;state.lastRenderedSignature=null;
+ chatUrlCache.clear();revokeChatMedia();$("chat-secret").value="";
+ updateChatSecurity();setStatus("chat-secret-status",t("chatSecretCleared"));
+ loadMessages();
+};
+$("message-input").onkeydown=event=>{
+ if(event.key==="Enter"&&!event.shiftKey&&!event.isComposing){
+  event.preventDefault();
+  if(!$("message-send").disabled)$("message-form").requestSubmit();
+ }
+};
+$("message-input").oninput=()=>{
+ const el=$("message-input");el.style.height="auto";el.style.height=Math.min(el.scrollHeight,136)+"px";
+};
+
 $("chat-history").onclick=()=>loadMessages(true);
+
+async function signedAttachmentUrl(message,session){
+ const enc=isEncryptedAttachment(message.file_path);
+ if(enc&&!session)throw Error(t("chatAttachmentLocked"));
+ const cached=chatUrlCache.get(message.file_path);
+ if(cached&&cached.expires>Date.now())return cached.url;
+ const {data,error}=await sb.storage.from("repo-radar-dm").createSignedUrl(message.file_path,1800);
+ if(error||!data?.signedUrl)throw error||Error("File not available");
+ if(!isPrivateStorageUrl(data.signedUrl,SUPABASE_URL))throw Error("Unexpected Storage URL");
+ let url=data.signedUrl;
+ if(enc){
+  const res=await fetch(url,{cache:"no-store",credentials:"omit"});
+  if(!res.ok)throw Error("Storage HTTP "+res.status);
+  const original=await decryptFile(await res.blob(),session,message.file_type);
+  if(session!==chatCryptoSession)throw Error("Conversation changed");
+  url=URL.createObjectURL(original);chatObjectUrls.add(url);
+ }
+ chatUrlCache.set(message.file_path,{url,expires:Date.now()+(enc?20:25)*60000});
+ return url;
+}
+async function openChatAttachment(message,current){
+ // Create the tab during the user's click to survive mobile popup restrictions.
+ const tab=window.open("about:blank","_blank");
+ if(tab)tab.opener=null;
+ try{
+  const url=await signedAttachmentUrl(message,chatCryptoSession);
+  if(!current()){if(tab)tab.close();return;}
+  if(tab)tab.location.replace(url);
+  else location.assign(url);
+ }catch(e){
+  if(tab)tab.close();
+  if(current())setStatus("chat-status",safeErr(e),true);
+ }
+}
+function attachmentCard(message,current){
+ const kind=attachmentKind(message.file_name,message.file_type);
+ const enc=isEncryptedAttachment(message.file_path);
+ const section=document.createElement("div");section.className="chat-attachment-card";
+ if(enc)section.classList.add("encrypted-attachment");
+ const main=document.createElement("div");main.className="attachment-main";
+ const icon=document.createElement("span");icon.className="attachment-kind-icon";icon.textContent=attachmentIcon(kind);
+ const detail=document.createElement("span");detail.className="attachment-details";
+ const name=document.createElement("strong");name.textContent=safeAttachmentName(message.file_name);
+ const info=document.createElement("small");info.textContent=prettyBytes(message.file_size)+(enc?" · 🔒 AES-256-GCM":"");
+ detail.append(name,info);main.append(icon,detail);
+ const button=document.createElement("button");button.type="button";button.className="attachment-open";
+ button.textContent=t("chatAttachmentOpen");button.onclick=()=>openChatAttachment(message,current);
+ main.append(button);section.append(main);
+ if(["image","video","audio"].includes(kind)){
+  const mediaBox=document.createElement("div");mediaBox.className="attachment-inline-media";
+  mediaBox.textContent=t("chatAttachmentLoading");
+  section.append(mediaBox);
+  const load=async()=>{
+   if(!current()||!mediaBox.isConnected)return;
+   if(enc&&!chatCryptoSession){
+    const notice=document.createElement("span");notice.className="attachment-locked-notice";
+    notice.textContent=t("chatAttachmentLocked");mediaBox.replaceChildren(notice);return;
+   }
+   try{
+    const url=await signedAttachmentUrl(message,chatCryptoSession);
+    if(!current()||!mediaBox.isConnected)return;
+    let el;
+    if(kind==="image"){
+     el=document.createElement("img");el.alt=safeAttachmentName(message.file_name);
+     el.loading="lazy";el.decoding="async";el.referrerPolicy="no-referrer";
+     el.onerror=()=>{mediaBox.textContent=t("chatAttachmentError");};
+     el.onclick=()=>openChatAttachment(message,current);
+    }else if(kind==="video"){
+     el=document.createElement("video");el.controls=true;el.preload="metadata";el.playsInline=true;
+    }else{
+     el=document.createElement("audio");el.controls=true;el.preload="metadata";
+    }
+    el.src=url;mediaBox.replaceChildren(el);
+   }catch(e){
+    if(current()&&mediaBox.isConnected){
+     const text=document.createElement("span");text.className="hint";text.textContent=t("chatAttachmentError");
+     mediaBox.replaceChildren(text);
+    }
+   }
+  };
+  if(typeof IntersectionObserver==="function"){
+   if(!mediaObserver)mediaObserver=new IntersectionObserver(entries=>{
+    for(const entry of entries)if(entry.isIntersecting){
+     mediaObserver.unobserve(entry.target);
+     entry.target._loadPreview?.();
+    }
+   },{root:$("chat-messages"),rootMargin:"160px"});
+   mediaBox._loadPreview=load;mediaObserver.observe(mediaBox);
+  }else{Promise.resolve().then(load);}
+ }
+ return section;
+}
+function renderChatMessages(messages,current,userId,older,first){
+ const box=$("chat-messages"),signature=messages.map(m=>m.id).join("|");
+ const height=box.scrollHeight,top=box.scrollTop,nearBottom=height-top-box.clientHeight<110;
+ if(signature===state.lastRenderedSignature)return;
+ state.lastRenderedSignature=signature;
+ if(mediaObserver){mediaObserver.disconnect();mediaObserver=null;}
+ const frag=document.createDocumentFragment();
+ if(!messages.length){
+  const empty=document.createElement("div");empty.className="chat-welcome";
+  const symbol=document.createElement("span");symbol.textContent="✧";symbol.className="chat-welcome-icon";
+  const title=document.createElement("h3");title.textContent=t("chatWelcomeHint");
+  empty.append(symbol,title);frag.append(empty);
+ }
+ for(const message of messages){
+  const mine=message.sender_id===userId;
+  const item=document.createElement("div");
+  item.className="message"+(mine?" mine":"")+(isEncryptedText(message.content)?" encrypted-message":"");
+  if(message.content){
+   const p=document.createElement("p");p.className="message-text";
+   if(isEncryptedText(message.content)){
+    p.textContent=t("chatEncryptedLocked");
+    if(chatCryptoSession){
+     const key=chatCryptoSession;
+     decryptMessage(message.content,key).then(plain=>{
+      if(current()&&item.isConnected&&chatCryptoSession===key)p.textContent=plain;
+     }).catch(()=>{
+      if(current()&&item.isConnected)p.textContent=t("chatDecryptFailed");
+     });
+    }
+   }else p.textContent=message.content;
+   item.append(p);
+  }
+  if(message.file_path)item.append(attachmentCard(message,current));
+  const time=document.createElement("time");time.className="message-time";
+  time.dateTime=message.created_at;
+  time.textContent=new Date(message.created_at).toLocaleString(locale,{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});
+  item.append(time);frag.append(item);
+ }
+ box.replaceChildren(frag);
+ if(older)box.scrollTop=top+box.scrollHeight-height;
+ else if(first||nearBottom)box.scrollTop=box.scrollHeight;
+}
+
 async function loadMessages(older=false){
 const userId=state.user?.id,peerId=state.peer?.id,epoch=state.chatEpoch;
 if(!userId||!peerId||state.messageBusy||(older&&!state.historyMore))return;
@@ -727,29 +989,67 @@ if(!current())return;if(batchError)throw batchError;page.push(...(batch||[]));if
 }}
 if(first||older){state.historyCursor=page.slice(-1)[0]||state.historyCursor;state.historyMore=page.length===100;}
 const messages=mergeMessages(Array.from(state.seen.values()),page);state.seen=new Map(messages.map(m=>[m.id,m]));
-const box=$("chat-messages"),height=box.scrollHeight,top=box.scrollTop,nearBottom=height-top-box.clientHeight<100;
-const frag=document.createDocumentFragment();
-for(const m of messages){const div=document.createElement("div");div.className="message"+(m.sender_id===userId?" mine":"");
-if(m.content){const p=document.createElement("p");p.className="message-text";p.textContent=m.content;div.append(p);}
-if(m.file_path){const a=document.createElement("button");a.className="attachment-link";a.textContent="📎 "+(m.file_name||"Attachment");a.type="button";a.onclick=async()=>{
-// Open synchronously so mobile popup blockers do not discard the user gesture.
-const win=window.open("about:blank","_blank");if(win)win.opener=null;
-try{const{data:link,error:linkError}=await sb.storage.from("repo-radar-dm").createSignedUrl(m.file_path,60);if(linkError)throw linkError;if(win)win.location.replace(link.signedUrl);else location.assign(link.signedUrl);}catch(e){if(win)win.close();if(current())setStatus("chat-status",safeErr(e),true);}};div.append(a);}
-const tm=document.createElement("div");tm.className="message-time";tm.textContent=new Date(m.created_at).toLocaleString(locale,{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});div.append(tm);frag.append(div);}
-box.replaceChildren(frag);if(older)box.scrollTop=top+box.scrollHeight-height;else if(first||nearBottom)box.scrollTop=box.scrollHeight;
+renderChatMessages(messages,current,userId,older,first);
 $("chat-history").hidden=!state.historyMore;
 }catch(e){if(current())setStatus("chat-status",safeErr(e),true);}finally{if(current()){state.messageBusy=false;$("chat-history").disabled=false;}}
 }
-$("file-input").onchange=()=>{const file=$("file-input").files[0];setStatus("file-preview",file?("📎 "+file.name+" ("+Math.ceil(file.size/1024)+" KB)"):"");};
-$("message-form").onsubmit=async e=>{e.preventDefault();const peer=state.peer,user=state.user;if(!peer||!user||$("message-send").disabled)return;const message=$("message-input").value.trim();const file=$("file-input").files[0];if(!message&&!file)return;if(Array.from(message).length>4000){setStatus("chat-status",t("messageTooLong"),true);return;}const epoch=state.chatEpoch;const current=()=>isCurrentChat(state,epoch,user.id,peer.id);const button=$("message-send");button.disabled=true;$("message-input").disabled=true;$("file-input").disabled=true;setStatus("chat-status",t("busy"));try{
+
+let selectedChatFile=null;
+function clearFileSelection(){
+ selectedChatFile=null;clearSelectedFile();
+}
+$("file-input").onchange=()=>{
+ const file=$("file-input").files[0];
+ if(selectedPreviewUrl){URL.revokeObjectURL(selectedPreviewUrl);selectedPreviewUrl=null;}
+ const preview=$("file-preview");preview.replaceChildren();
+ selectedChatFile=file||null;
+ preview.classList.toggle("hidden",!file);
+ if(!file)return;
+ const kind=attachmentKind(file.name,file.type),line=document.createElement("div");
+ line.className="selected-file-line";
+ const icon=document.createElement("span");icon.textContent=attachmentIcon(kind);
+ const text=document.createElement("span");text.textContent=safeAttachmentName(file.name)+" · "+prettyBytes(file.size);
+ const remove=document.createElement("button");remove.type="button";remove.className="file-remove";
+ remove.textContent="×";remove.setAttribute("aria-label","Remove attachment");remove.onclick=clearFileSelection;
+ line.append(icon,text,remove);preview.append(line);
+ if(["image","video","audio"].includes(kind)){
+  selectedPreviewUrl=URL.createObjectURL(file);
+  const element=document.createElement(kind==="image"?"img":kind==="video"?"video":"audio");
+  element.src=selectedPreviewUrl;
+  if(kind==="image")element.alt=safeAttachmentName(file.name);
+  else{element.controls=true;element.preload="metadata";}
+  if(kind==="video")element.playsInline=true;
+  element.className="selected-file-media";preview.append(element);
+ }
+};
+$("message-form").onsubmit=async e=>{e.preventDefault();const peer=state.peer,user=state.user;if(!peer||!user||$("message-send").disabled)return;const message=$("message-input").value.trim();const file=selectedChatFile;if(!message&&!file)return;if(Array.from(message).length>4000){setStatus("chat-status",t("messageTooLong"),true);return;}const epoch=state.chatEpoch;const current=()=>isCurrentChat(state,epoch,user.id,peer.id);const button=$("message-send");button.disabled=true;$("message-input").disabled=true;$("file-input").disabled=true;setStatus("chat-status",t("busy"));try{
 let file_path=null,file_name=null,file_type=null,file_size=null;
+const secureSession=chatCryptoSession;
+let storedMessage=message;
+if(secureSession&&message){
+ try{storedMessage=await encryptMessage(message,secureSession);}
+ catch(e){throw Error(t("chatE2eeTextTooLong"));}
+}
 if(file){if(file.size>25*1024*1024)throw Error(t("fileTooLarge"));const ext=file.name.split(".").pop()?.toLowerCase();if(!allowedExt.has(ext)||blockedMime.test(file.type||""))throw Error(t("unsupportedFile"));
-file_name=file.name.slice(0,180);file_type=attachmentMime(file.name,file.type);if(!file_type)throw Error(t("unsupportedFile"));file_size=file.size;
-file_path=user.id+"/"+peer.id+"/"+generateUUID()+"."+ext;const{error:uploadError}=await sb.storage.from("repo-radar-dm").upload(file_path,file,{contentType:file_type,upsert:false});if(uploadError)throw uploadError;}
-const {error}=await sb.from("direct_messages").insert({sender_id:user.id,recipient_id:peer.id,content:message,file_path,file_name,file_type,file_size});
+file_name=safeAttachmentName(file.name);file_type=attachmentMime(file.name,file.type);
+if(!file_type)throw Error(t("unsupportedFile"));
+file_size=file.size;
+let upload=file,uploadType=file_type;
+if(secureSession){
+ if(file.size>ENCRYPTED_FILE_MAX_BYTES)throw Error(t("chatEncryptionActiveNote"));
+ upload=await encryptFile(file,secureSession);
+ uploadType="application/json";
+ if(upload.size>25*1024*1024)throw Error(t("fileTooLarge"));
+ file_path=user.id+"/"+peer.id+"/enc-"+generateUUID()+".json";
+}else{
+ file_path=user.id+"/"+peer.id+"/"+generateUUID()+"."+ext;
+}
+const{error:uploadError}=await sb.storage.from("repo-radar-dm").upload(file_path,upload,{contentType:uploadType,upsert:false});
+if(uploadError)throw uploadError;}
+const {error}=await sb.from("direct_messages").insert({sender_id:user.id,recipient_id:peer.id,content:storedMessage,file_path,file_name,file_type,file_size});
 if(error){if(file_path){const cleanup=await sb.storage.from("repo-radar-dm").remove([file_path]);if(cleanup.error||!cleanup.data?.length)throw Error(t("cleanupFailed"));}throw error;}
 if(!current())return;setStatus("chat-status","");
-$("message-input").value="";$("file-input").value="";setStatus("file-preview","");await loadMessages();await loadContacts();
+$("message-input").value="";$("message-input").style.height="auto";clearFileSelection();await loadMessages();await loadContacts();
 }catch(err){if(current())setStatus("chat-status",safeErr(err),true);}finally{if(current()){button.disabled=false;$("message-input").disabled=false;$("file-input").disabled=false;}}};
 localized();reportOAuthRedirectError();onSession().catch(e=>console.error(e));loadRepos();
 
