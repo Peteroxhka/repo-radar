@@ -24,7 +24,9 @@ const blockedMime=/x-msdownload|x-executable|x-sh|x-bat|x-dosexec|javascript|tex
 let locale=localStorage.getItem("radar-locale")||((navigator.language||"ru").slice(0,2));
 if(!translations[locale])locale="en";
 let theme=localStorage.getItem("radar-theme")||"dark";if(!["dark","light","cosmic"].includes(theme))theme="dark";
-let state={chatEpoch:0,messageBusy:false,historyCursor:null,historyMore:false,contactRequest:0,category:"all",language:"",search:"",user:null,profile:null,peer:null,allRows:[],totalCount:0,catalogTotal:0,categoryCounts:{},categoryCountsLoaded:false,hasMore:true,loading:false,languageOptions:[],languageOptionsLoaded:false,listRequestId:0,searchTimer:null,seen:new Map(),sub:null,refreshTimer:null,register:false};
+let state={chatEpoch:0,messageBusy:false,historyCursor:null,historyMore:false,contactRequest:0,category:"all",language:"",search:"",sort:"popular",includeDescription:false,user:null,profile:null,peer:null,allRows:[],totalCount:0,catalogTotal:0,categoryCounts:{},categoryCountsLoaded:false,hasMore:true,loading:false,languageOptions:[],languageOptionsLoaded:false,listRequestId:0,searchTimer:null,seen:new Map(),sub:null,refreshTimer:null,register:false};
+Object.assign(translations.ru,{sort:"Сортировка",sortPopular:"Самые популярные ★",sortLeast:"Меньше звёзд",sortRecent:"Недавно обновлённые",sortNewest:"Новые проекты",sortForked:"Чаще копируют",searchDescription:"Искать также в описаниях",ps4Website:"Открыть сайт"});
+Object.assign(translations.en,{sort:"Sort",sortPopular:"Most starred ★",sortLeast:"Least starred",sortRecent:"Recently updated",sortNewest:"Newest repositories",sortForked:"Most forked",searchDescription:"Also search descriptions",ps4Website:"Open website"});
 const categoryLabels={ru:"Без категории",en:"Unclassified",es:"Sin categoría",fr:"Sans catégorie",de:"Nicht kategorisiert",pt:"Sem categoria",zh:"未分类",ja:"未分類",ko:"미분류",ar:"غير مصنف",hi:"अवर्गीकृत",tr:"Kategorisiz"};
 Object.assign(translations.ru,{olderMessages:"Предыдущие сообщения",ps4Title:"Мир PlayStation 4",ps4Intro:"Инструменты разработки, эмуляция и проекты сообщества PS4.",ps4Source:"Открыть репозиторий",ps4Search:"Найти PS4 в каталоге",ps4Reference:"Проект из твоей подборки",ps4Sdk:"Открытый модульный SDK для разработки под PS4.",ps4Toolchain:"Инструменты и примеры для создания домашних приложений PS4.",ps4Emulator:"Эмулятор PlayStation 4 для компьютера.",cleanupFailed:"Сообщение не отправлено. Не удалось удалить вложение из хранилища.",messageTooLong:"Сообщение не должно превышать 4000 символов."});
 Object.assign(translations.en,{olderMessages:"Older messages",ps4Title:"The PlayStation 4 world",ps4Intro:"Development tools, emulation and PS4 community projects.",ps4Source:"Open repository",ps4Search:"Find PS4 in the catalog",ps4Reference:"Project from your collection",ps4Sdk:"An open modular SDK for PS4 development.",ps4Toolchain:"Tools and examples for building PS4 homebrew applications.",ps4Emulator:"A PlayStation 4 emulator for desktop computers.",cleanupFailed:"Message not sent. The attachment could not be removed from storage.",messageTooLong:"Messages must not exceed 4000 characters."});
@@ -47,8 +49,8 @@ async function updateCategoryCounts(){if(state.categoryCountsLoaded)return;try{c
 const REPO_PAGE_SIZE=48;
 async function updateLanguageOptions(){if(!state.languageOptionsLoaded){const{data,error}=await sb.rpc("list_repo_languages");if(error){console.warn("Language list unavailable:",error.message);state.languageOptions=[...new Set(state.allRows.map(r=>r.language).filter(Boolean))].sort((a,b)=>a.localeCompare(b));}else{state.languageOptions=(data||[]).map(row=>row.language).filter(Boolean);}state.languageOptionsLoaded=true;}const select=$("language"),current=state.language;const names=state.languageOptions.slice();if(current&&!names.includes(current))names.unshift(current);select.replaceChildren(new Option(t("allLanguages"),""));for(const name of names)select.add(new Option(name,name));select.value=current;}
 function renderRepos(){const rows=state.allRows;const frag=document.createDocumentFragment();if(!rows.length){const empty=document.createElement("div");empty.className="empty";empty.textContent=t("noProjects");frag.append(empty);}
-for(const r of rows){const card=document.createElement("article");card.className="repo-card";const title=document.createElement("a");title.className="repo-title";title.textContent=r.full_name;try{const url=new URL(r.html_url);if(url.protocol==="https:"&&url.hostname==="github.com"){title.href=url.href;title.target="_blank";title.rel="noopener noreferrer";}}catch{}const desc=document.createElement("p");desc.className="repo-desc";desc.textContent=r.description||t("noDescription");const meta=document.createElement("div");meta.className="repo-meta";
-const things=[[r.language,"repo-tag"],["★ "+number(r.stars)],r.license_spdx?[r.license_spdx]:null,r.pushed_at?[new Date(r.pushed_at).toLocaleDateString(locale)]:null].filter(Boolean);
+for(const r of rows){const card=document.createElement("article");card.className="repo-card";const title=document.createElement("a");title.className="repo-title";title.textContent=r.name;try{const url=new URL(r.html_url);if(url.protocol==="https:"&&url.hostname==="github.com"){title.href=url.href;title.target="_blank";title.rel="noopener noreferrer";}}catch{}const desc=document.createElement("p");desc.className="repo-desc";desc.textContent=r.description||t("noDescription");const meta=document.createElement("div");meta.className="repo-meta";
+const things=[[r.owner_login,"repo-owner"],[r.language,"repo-tag"],["★ "+number(r.stars)],r.license_spdx?[r.license_spdx]:null,r.pushed_at?[new Date(r.pushed_at).toLocaleDateString(locale)]:null].filter(Boolean);
 for(const [str,cls] of things){const item=document.createElement("span");if(cls)item.className=cls;item.textContent=str;meta.append(item);}card.append(title,desc,meta);frag.append(card);} $("grid").replaceChildren(frag);}
 async function loadRepos(reset=true){
 if(!reset&&(state.loading||!state.hasMore))return;
@@ -62,18 +64,17 @@ setStatus("status",t("loading"));
 try{
 await updateCategoryCounts();
 if(requestId!==state.listRequestId)return;
-let query=sb.from("repos").select("id,full_name,description,html_url,language,stars,license_spdx,category,pushed_at",{count:"exact"});
-if(state.category!=="all")query=query.eq("category",state.category);
-if(state.language)query=query.eq("language",state.language);
-const term=normalizeSearch(state.search);
-if(term)query=query.or(`full_name.ilike.%${term}%,description.ilike.%${term}%`);
-query=query.order("stars",{ascending:false}).order("id",{ascending:false}).range(offset,offset+REPO_PAGE_SIZE-1);
-const{data,error,count}=await query;
+const{data,error}=await sb.rpc("search_catalog",{
+ q:normalizeSearch(state.search),category_filter:state.category,
+ language_filter:state.language,sort_by:state.sort,
+ include_description:state.includeDescription,
+ page_size:REPO_PAGE_SIZE,page_offset:offset
+});
 if(requestId!==state.listRequestId)return;
 if(error)throw error;
 const page=data||[];
 state.allRows=reset?page:state.allRows.concat(page);
-state.totalCount=Number(count??state.allRows.length);
+state.totalCount=Number(page[0]?.total_count??(reset?0:state.totalCount));
 state.hasMore=page.length===REPO_PAGE_SIZE&&state.allRows.length<state.totalCount;
 $("repo-count").textContent=state.totalCount.toLocaleString(locale);
 await updateLanguageOptions();
@@ -93,6 +94,8 @@ if(requestId===state.listRequestId){state.loading=false;more.disabled=false;}
 }}
 
 $("language").onchange=e=>{state.language=e.target.value;loadRepos(true);};
+$("repo-sort").onchange=e=>{state.sort=e.target.value;loadRepos(true);};
+$("search-descriptions").onchange=e=>{state.includeDescription=e.target.checked;loadRepos(true);};
 $("repo-search").oninput=e=>{state.search=e.target.value.trim();state.listRequestId+=1;state.loading=true;clearTimeout(state.searchTimer);state.searchTimer=setTimeout(()=>loadRepos(true),250);};
 $("load-more").onclick=()=>loadRepos(false);
 if("IntersectionObserver" in window){

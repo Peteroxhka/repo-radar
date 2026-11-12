@@ -32,5 +32,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SUPABASE_URL: https://tlqsmwsjeogudgijnpnu.supabase.co
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          MAX_PAGES_PER_RUN: "850"
         run: node scripts/collect.mjs

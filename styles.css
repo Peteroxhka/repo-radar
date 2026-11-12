@@ -50,3 +50,11 @@ footer{text-align:center;padding:60px 0 30px;color:var(--muted);font-size:12px}f
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important}}
 
 #view-ps4 .repo-title{overflow-wrap:anywhere;margin:0;font-size:1.05rem}#view-ps4 .repo-card .button{margin-top:auto;align-self:flex-start}#chat-history{align-self:center;margin:12px}#chat-history[hidden]{display:none}
+
+/* Extended catalog controls */
+.filter-right{flex-wrap:wrap;align-items:center;justify-content:flex-end}
+.search-extra{display:flex;align-items:center;gap:7px;white-space:nowrap;color:var(--muted);font-size:12px;cursor:pointer}
+.search-extra input{accent-color:var(--accent);width:16px;height:16px}
+.filter-right .select-wrap select{min-width:155px}
+.repo-owner{font-size:11px;color:var(--muted)}
+@media(max-width:640px){.filter-right{justify-content:stretch}.search-extra{width:100%;padding:5px 0}}
