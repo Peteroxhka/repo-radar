@@ -1,8 +1,14 @@
 name: Collect repositories
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/collect.mjs"
+      - ".github/workflows/collect.yml"
+      - "supabase/migrations/**"
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "0 * * * *"
   workflow_dispatch:
 
 permissions:
