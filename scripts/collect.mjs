@@ -185,8 +185,9 @@ async function importPublicCatalog() {
   }
 
   while (pages < MAX_PAGES_PER_RUN && !finished) {
+    const requestCursor = pendingCursor;
     const { data, headers } = await requestJson(
-      `${GH}/repositories?since=${cursor === pendingCursor ? cursor : pendingCursor}`,
+      `${GH}/repositories?since=${requestCursor}`,
       "GitHub public repositories",
     );
     if (!Array.isArray(data)) throw new Error("GitHub /repositories returned an unexpected payload.");
@@ -198,11 +199,12 @@ async function importPublicCatalog() {
     const ids = data.map((repo) => Number(repo.id)).filter(Number.isSafeInteger);
     if (ids.length !== data.length) throw new Error("GitHub returned a repository without a valid numeric ID.");
     const pageLastId = Math.max(...ids);
-    if (pageLastId <= pendingCursor) throw new Error(`GitHub cursor did not advance (current ${pendingCursor}, received ${pageLastId}).`);
+    if (pageLastId <= requestCursor) throw new Error(`GitHub cursor did not advance (current ${requestCursor}, received ${pageLastId}).`);
 
     pending.push(...data.map((repo) => toRow(repo)));
-    pendingCursor = nextCursorFromLink(headers.get("link")) ?? pageLastId;
-    if (pendingCursor <= cursor) throw new Error(`GitHub next cursor did not advance beyond ${cursor}.`);
+    const linkedCursor = nextCursorFromLink(headers.get("link"));
+    pendingCursor = linkedCursor && linkedCursor >= pageLastId ? linkedCursor : pageLastId;
+    if (pendingCursor <= requestCursor) throw new Error(`GitHub next cursor did not advance beyond ${requestCursor}.`);
 
     pages += 1;
     received += data.length;
