@@ -37,3 +37,7 @@ GitHub open-source discovery feed + community features. A responsive static app 
 ## Limitations
 
 Uploads are limited to 25 MB and allowlisted file formats. The storage policy is designed to prevent casual cross-user access; for production-scale moderation or malware checks, introduce a dedicated scanning and abuse-reporting workflow. Messages are protected by Supabase RLS but are **not end-to-end encrypted**. Localizations need native-speaker review. Passwords are handled by Supabase Auth, not stored by Repo Radar.
+
+## Catalog API hardening
+
+The browser can only read repository rows. The importer uses the service role for writes. The `list_repo_languages()` SQL function runs as the caller (not SECURITY DEFINER) and supplies the language filter options without loading the whole catalog into the browser.
