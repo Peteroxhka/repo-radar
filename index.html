@@ -3,27 +3,120 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0b1020">
-  <meta name="description" content="Repo Radar — свежие и популярные открытые проекты GitHub по категориям.">
-  <title>Repo Radar — открытые проекты GitHub</title>
+  <meta name="theme-color" content="#0a1020">
+  <meta name="description" content="Repo Radar — открытые проекты GitHub, профили и сообщения.">
+  <title>Repo Radar · Discover together</title>
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./app.js"></script>
 </head>
-<body>
-  <header class="topbar"><span class="brand"><span class="brand-mark">R</span> Repo Radar</span><span class="top-note">Open-source discovery</span></header>
+<body data-theme="dark">
+  <div class="ambient" aria-hidden="true"></div>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="./" aria-label="Repo Radar"><span class="brand-mark">R<span class="brand-dot">.</span></span><span>repo<span class="brand-thin">radar</span></span></a>
+      <nav class="nav" aria-label="Main navigation">
+        <button class="nav-item active" id="tab-discover" data-i18n="discover">Обзор</button>
+        <button class="nav-item" id="tab-messages" data-i18n="messages">Сообщения</button>
+      </nav>
+      <div class="top-actions">
+        <select id="locale" class="small-select" aria-label="Language"></select>
+        <select id="theme" class="small-select" aria-label="Theme">
+          <option value="dark" data-i18n="darkTheme">Тёмная</option>
+          <option value="light" data-i18n="lightTheme">Светлая</option>
+          <option value="cosmic" data-i18n="cosmicTheme">Космос</option>
+        </select>
+        <button class="button button-outline" id="auth-open" data-i18n="signIn">Войти</button>
+        <button class="profile-pill hidden" id="profile-open" aria-label="Open profile">
+          <span class="avatar-mini" id="top-avatar">R</span><span id="top-username">Профиль</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
   <main class="shell">
-    <section class="hero">
-      <p class="eyebrow">ПОПУЛЯРНОЕ И СВЕЖЕЕ НА GITHUB</p>
-      <h1>Находи проекты,<br><span>которые стоит знать.</span></h1>
-      <p class="lead">Лента обновляется каждые шесть часов. Показываем только проекты с описанием и лицензией.</p>
+    <section id="view-discover">
+      <section class="hero">
+        <div class="eyebrow"><span class="pulse"></span><span data-i18n="eyebrow">ОТКРЫТЫЙ КОД. НОВЫЕ ИДЕИ.</span></div>
+        <h1 data-i18n="headline">Находи свой следующий <em>любимый проект.</em></h1>
+        <p class="lead" data-i18n="tagline">Лучшие открытые репозитории GitHub в одной красивой ленте. Обновление каждые шесть часов.</p>
+        <div class="hero-actions"><a href="#repos" class="button button-primary" data-i18n="explore">Исследовать проекты</a><span class="hero-stat"><strong id="repo-count">—</strong> <span data-i18n="projects">проектов</span></span></div>
+        <div class="hero-shine" aria-hidden="true"></div>
+      </section>
+
+      <section id="repos" class="feed-section">
+        <div class="section-heading"><div><p class="section-kicker" data-i18n="discover">Обзор</p><h2 data-i18n="trending">Проекты, достойные внимания</h2></div></div>
+        <div class="filters">
+          <div class="chips" id="categories" aria-label="Categories"></div>
+          <div class="filter-right">
+            <label class="search-wrap"><span class="sr-only" data-i18n="search">Поиск</span><input id="repo-search" type="search" placeholder="Поиск по проектам..." autocomplete="off"></label>
+            <label class="select-wrap"><span class="sr-only" data-i18n="language">Язык программирования</span><select id="language"><option value="" data-i18n="allLanguages">Все языки</option></select></label>
+          </div>
+        </div>
+        <p class="status" id="status" role="status"></p>
+        <div class="repo-grid" id="grid"><p class="empty" data-i18n="loading">Загружаем проекты...</p></div>
+      </section>
     </section>
-    <section class="filters panel">
-      <div class="chips" id="categories"></div>
-      <label>Язык<select id="language"><option value="">Все языки</option></select></label>
+
+    <section id="view-messages" class="hidden">
+      <div class="section-heading messages-heading"><div><p class="section-kicker" data-i18n="community">СООБЩЕСТВО</p><h1 data-i18n="yourMessages">Личные сообщения</h1><p class="lead compact" data-i18n="messagesIntro">Общайся и делись файлами. Без звонков.</p></div></div>
+      <div id="chat-guest" class="empty large"><h2 data-i18n="joinConversation">Присоединяйся к общению</h2><p data-i18n="loginToChat">Войди или зарегистрируйся, чтобы писать другим пользователям.</p><button class="button button-primary" id="chat-login" data-i18n="signIn">Войти</button></div>
+      <div id="chat-app" class="chat-layout hidden">
+        <aside class="chat-sidebar">
+          <h2 data-i18n="conversations">Диалоги</h2>
+          <label class="sr-only" for="user-search" data-i18n="findUser">Найти пользователя</label>
+          <input id="user-search" type="search" autocomplete="off" placeholder="Никнейм пользователя...">
+          <button id="find-user" class="button button-primary full" data-i18n="startChat">Начать диалог</button>
+          <p class="hint" id="find-status"></p>
+          <div id="conversation-list" class="conversation-list"></div>
+        </aside>
+        <div class="chat-panel">
+          <div class="chat-partner" id="chat-partner" data-i18n="chooseChat">Выбери собеседника</div>
+          <div class="chat-messages" id="chat-messages" aria-live="polite"><div class="empty" data-i18n="chooseChat">Выбери собеседника</div></div>
+          <form id="message-form" class="message-form">
+            <input id="file-input" class="sr-only" type="file" accept="image/*,video/*,audio/*,.pdf,.txt,.md,.csv,.json,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.zip,.7z,.rar">
+            <label for="file-input" class="attach-btn" title="Attach file" aria-label="Attach file">＋</label>
+            <input id="message-input" type="text" maxlength="4000" autocomplete="off" placeholder="Написать сообщение..." disabled>
+            <button id="message-send" class="button button-primary" type="submit" disabled data-i18n="send">Отправить</button>
+          </form>
+          <p id="file-preview" class="hint file-preview"></p>
+          <p class="hint small-note" data-i18n="attachmentLimit">Вложения до 25 МБ, без исполняемых файлов.</p>
+          <p id="chat-status" class="hint" role="status"></p>
+        </div>
+      </div>
     </section>
-    <p class="status" id="status" role="status"></p>
-    <div class="grid" id="grid"><div class="empty">Загружаем…</div></div>
-    <footer>Repo Radar <span>·</span> Данные GitHub API</footer>
+    <footer>Repo Radar <span>·</span> <span data-i18n="footerNote">Независимый каталог открытого кода</span></footer>
   </main>
+
+  <dialog id="auth-dialog" class="modal">
+    <form id="auth-form" class="modal-inner">
+      <button type="button" class="close" data-close="auth-dialog" aria-label="Close">×</button>
+      <p class="section-kicker">REPO RADAR</p>
+      <h2 id="auth-title" data-i18n="welcomeBack">Добро пожаловать</h2>
+      <p class="hint" data-i18n="authIntro">Сохраняй профиль и общайся с разработчиками.</p>
+      <button type="button" class="button github-button full" id="github-login">◎ <span data-i18n="continueGithub">Продолжить с GitHub</span></button>
+      <div class="or-line"><span data-i18n="orEmail">или по электронной почте</span></div>
+      <label id="username-label" class="field hidden"><span data-i18n="username">Имя пользователя</span><input id="auth-username" autocomplete="username" minlength="3" maxlength="24" pattern="[a-zA-Z0-9_]{3,24}" placeholder="username"></label>
+      <label class="field"><span>Email</span><input id="auth-email" type="email" required autocomplete="email" placeholder="you@example.com"></label>
+      <label class="field"><span data-i18n="password">Пароль</span><input id="auth-password" type="password" required minlength="8" autocomplete="current-password" placeholder="••••••••"></label>
+      <button type="submit" id="auth-submit" class="button button-primary full" data-i18n="signIn">Войти</button>
+      <button type="button" id="auth-switch" class="text-button" data-i18n="needAccount">Нет аккаунта? Зарегистрироваться</button>
+      <p id="auth-status" class="hint" role="status"></p>
+    </form>
+  </dialog>
+
+  <dialog id="profile-dialog" class="modal">
+    <form id="profile-form" class="modal-inner">
+      <button type="button" class="close" data-close="profile-dialog" aria-label="Close">×</button>
+      <p class="section-kicker" data-i18n="account">АККАУНТ</p>
+      <h2 data-i18n="yourProfile">Твой профиль</h2>
+      <div class="profile-preview"><div class="avatar-large" id="profile-avatar">R</div><div><b id="profile-current-username">—</b><p class="hint" id="profile-provider"></p></div></div>
+      <label class="field"><span data-i18n="username">Имя пользователя</span><input id="profile-username" minlength="3" maxlength="24" pattern="[a-zA-Z0-9_]{3,24}" required></label>
+      <label class="field" id="avatar-upload-row"><span data-i18n="uploadAvatar">Загрузить фото профиля (до 5 МБ)</span><input id="avatar-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif"></label>
+      <p class="hint" id="avatar-github-note" data-i18n="githubAvatarHint">Для GitHub-аккаунта изображение меняется в настройках GitHub.</p>
+      <button type="submit" class="button button-primary full" data-i18n="saveChanges">Сохранить</button>
+      <button type="button" class="button button-outline full" id="signout" data-i18n="signOut">Выйти</button>
+      <p class="hint" id="profile-status" role="status"></p>
+    </form>
+  </dialog>
 </body>
 </html>
