@@ -63,3 +63,23 @@ footer{text-align:center;padding:60px 0 30px;color:var(--muted);font-size:12px}f
 .official-project-tag{display:inline-flex;align-self:flex-start;border:1px solid var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,transparent);border-radius:999px;padding:4px 10px;font-size:11px;font-weight:800}
 .project-site-link{display:inline-flex;align-self:flex-start;margin-top:auto;color:var(--accent);font-size:12px;font-weight:800;text-decoration:none;border-bottom:1px solid currentColor;padding:2px 0}
 .project-site-link:hover{text-decoration:underline}
+
+/* These facets are available only inside Console WebKit, without disturbing
+   the normal catalog search/language/star sorting controls. */
+.console-filters{border:1px solid var(--border);background:var(--surface);border-radius:18px;padding:18px;margin:-5px 0 19px}
+.console-filters-heading{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:5px 16px;margin-bottom:13px}
+.console-filters-heading h3{font-size:16px;font-family:'Space Grotesk',sans-serif}
+.console-filters-heading p{color:var(--muted);font-size:11px;max-width:580px}
+.console-filters-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.console-filter-field{display:grid;gap:6px;color:var(--muted);font-size:12px;font-weight:700;min-width:0}
+.console-filter-field select{width:100%;min-width:0;max-width:100%;background:var(--surface2);color:var(--text);padding:10px 9px;border-radius:10px;border:1px solid var(--border)}
+@media(max-width:850px){.console-filters-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:440px){.console-filters-grid{grid-template-columns:1fr}}
+
+/* Keep enormous README/HTML pasted into repository descriptions from
+   stretching discovery cards. The full text is opt-in and scrollable. */
+.repo-description-wrap{display:flex;flex-direction:column;align-items:flex-start;gap:6px;flex:1;min-width:0}
+.repo-desc{max-width:100%;min-width:0;overflow-wrap:anywhere;white-space:pre-wrap}
+.repo-desc.expanded{max-height:240px;overflow-y:auto;overscroll-behavior:contain;width:100%;padding-right:7px}
+.description-toggle{border:0;background:transparent;color:var(--accent);font-size:12px;font-weight:800;padding:2px 0;cursor:pointer}
+.description-toggle:hover{text-decoration:underline}

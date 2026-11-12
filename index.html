@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -60,6 +60,18 @@
             <label class="search-extra"><input type="checkbox" id="search-descriptions"><span data-i18n="searchDescription">Искать также в описаниях</span></label>
           </div>
         </div>
+        <section id="console-filters" class="console-filters hidden" aria-label="Console WebKit filters">
+          <div class="console-filters-heading">
+            <h3 data-i18n="consoleFilterHeading">Console WebKit filters</h3>
+            <p data-i18n="consoleFilterNote">Only versions explicitly mentioned in the project metadata are available; unknown compatibility is not assumed.</p>
+          </div>
+          <div class="console-filters-grid">
+            <label class="console-filter-field"><span data-i18n="consoleModel">Console</span><select id="console-model"><option value="">All consoles</option></select></label>
+            <label class="console-filter-field"><span data-i18n="projectVersion">Project version</span><select id="console-version"><option value="">Any version</option></select></label>
+            <label class="console-filter-field"><span data-i18n="firmwareVersion">Firmware version</span><select id="console-firmware-version"><option value="">Any firmware version</option></select></label>
+            <label class="console-filter-field"><span data-i18n="firmwareType">Firmware type</span><select id="console-firmware-type"><option value="">Any firmware type</option></select></label>
+          </div>
+        </section>
         <p class="status" id="status" role="status"></p>
         <div class="repo-grid" id="grid"><p class="empty" data-i18n="loading">Загружаем проекты...</p></div>
          <div class="load-more-sentinel" id="load-more-sentinel" aria-hidden="true"></div>

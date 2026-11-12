@@ -1,6 +1,7 @@
 import {normalizeSearch, mergeMessages, isCurrentChat, dmConversationFilter, attachmentMime} from "./lib/core.mjs";
 import {createClient} from "https://esm.sh/@supabase/supabase-js@2.57.0";
 import {trustedGitHubPagesSite} from "./lib/catalog.mjs";
+import {consoleMetadata,filterConsoleProjects,sortConsoleProjects,consoleFacetOptions} from "./lib/console-filters.mjs";
 import {SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, DATABASE_SCHEMA} from "./config.js";
 const sb=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{db:{schema:DATABASE_SCHEMA},auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const $=id=>document.getElementById(id);
@@ -25,14 +26,31 @@ translations.ru.visitSite="Открыть сайт проекта";
 translations.en.visitSite="Visit project website";
 translations.ru.console_webkit="Консольные WebKit";
 translations.en.console_webkit="Console WebKit";
+translations.en.expandDescription="Show full description";
+translations.en.collapseDescription="Show less";
+translations.ru.expandDescription="Показать полностью";
+translations.ru.collapseDescription="Свернуть";
+Object.assign(translations.en,{
+ consoleFilterHeading:"Console WebKit filters",consoleFilterNote:"Only versions stated in project metadata are shown. Unspecified compatibility is not assumed.",
+ consoleModel:"Console",projectVersion:"Project version",firmwareVersion:"Firmware version",firmwareType:"Firmware type",
+ anyConsole:"All consoles",anyVersion:"Any project version",anyFirmwareVersion:"Any firmware version",
+ anyFirmwareType:"Any firmware type",unspecified:"Not specified"
+});
+Object.assign(translations.ru,{
+ consoleFilterHeading:"Фильтры консольных WebKit",consoleFilterNote:"Указываются только версии из описаний и названий проектов. Неизвестную совместимость не предполагаем.",
+ consoleModel:"Консоль",projectVersion:"Версия проекта",firmwareVersion:"Версия прошивки",firmwareType:"Тип прошивки",
+ anyConsole:"Все консоли",anyVersion:"Любая версия проекта",anyFirmwareVersion:"Любая версия прошивки",
+ anyFirmwareType:"Любой тип прошивки",unspecified:"Не указано"
+});
 const categoryKeys=["all","programming","tools","ai","data","web","learning","games","console_webkit","other"];
 const localeNames={ru:"Русский",en:"English",es:"Español",fr:"Français",de:"Deutsch",pt:"Português",zh:"中文",ja:"日本語",ko:"한국어",ar:"العربية",hi:"हिन्दी",tr:"Türkçe"};
 const allowedExt=new Set(["jpg","jpeg","png","webp","gif","bmp","heic","mp4","webm","mov","m4v","mp3","ogg","wav","m4a","aac","flac","pdf","txt","md","csv","json","doc","docx","xls","xlsx","ppt","pptx","odt","ods","odp","zip","7z","rar"]);
 const blockedMime=/x-msdownload|x-executable|x-sh|x-bat|x-dosexec|javascript|text\/html|svg\+xml/i;
-let locale=localStorage.getItem("radar-locale")||((navigator.language||"ru").slice(0,2));
+// English is the default for new visitors; an explicit saved choice wins.
+let locale=localStorage.getItem("radar-locale")||"en";
 if(!translations[locale])locale="en";
 let theme=localStorage.getItem("radar-theme")||"dark";if(!["dark","light","cosmic"].includes(theme))theme="dark";
-let state={chatEpoch:0,messageBusy:false,historyCursor:null,historyMore:false,contactRequest:0,category:"all",language:"",search:"",sort:"popular",includeDescription:false,user:null,profile:null,peer:null,allRows:[],totalCount:0,catalogTotal:0,categoryCounts:{},categoryCountsLoaded:false,hasMore:true,loading:false,languageOptions:[],languageOptionsLoaded:false,listRequestId:0,searchTimer:null,seen:new Map(),sub:null,refreshTimer:null,register:false};
+let state={chatEpoch:0,messageBusy:false,historyCursor:null,historyMore:false,contactRequest:0,category:"all",language:"",search:"",sort:"popular",includeDescription:false,consoleFilters:{console:"",version:"",firmwareVersion:"",firmwareType:""},consoleRows:null,user:null,profile:null,peer:null,allRows:[],totalCount:0,catalogTotal:0,categoryCounts:{},categoryCountsLoaded:false,hasMore:true,loading:false,languageOptions:[],languageOptionsLoaded:false,listRequestId:0,searchTimer:null,seen:new Map(),sub:null,refreshTimer:null,register:false};
 Object.assign(translations.ru,{sort:"Сортировка",sortPopular:"Самые популярные ★",sortLeast:"Меньше звёзд",sortRecent:"Недавно обновлённые",sortNewest:"Новые проекты",sortForked:"Чаще копируют",searchDescription:"Искать также в описаниях",ps4Website:"Открыть сайт"});
 Object.assign(translations.en,{sort:"Sort",sortPopular:"Most starred ★",sortLeast:"Least starred",sortRecent:"Recently updated",sortNewest:"Newest repositories",sortForked:"Most forked",searchDescription:"Also search descriptions",ps4Website:"Open website"});
 const categoryLabels={ru:"Без категории",en:"Unclassified",es:"Sin categoría",fr:"Sans catégorie",de:"Nicht kategorisiert",pt:"Sem categoria",zh:"未分类",ja:"未分類",ko:"미분류",ar:"غير مصنف",hi:"अवर्गीकृत",tr:"Kategorisiz"};
@@ -45,23 +63,93 @@ function localized(){document.documentElement.lang=locale;document.documentEleme
 document.querySelectorAll("[data-i18n]").forEach(el=>{const key=el.dataset.i18n;if(key==="headline")el.innerHTML=t(key);else el.textContent=t(key);});
 $("repo-search").placeholder=t("repoSearch");$("user-search").placeholder=t("userSearch");$("message-input").placeholder=t("messagePlaceholder");if($("language").options.length)$("language").options[0].textContent=t("allLanguages");
 $("auth-title").textContent=state.register?t("register"):t("welcomeBack");$("auth-submit").textContent=state.register?t("register"):t("signIn");$("auth-switch").textContent=state.register?t("alreadyAccount"):t("needAccount");
-$("locale").value=locale;renderCategories();renderRepos();}
+$("locale").value=locale;renderCategories();if(state.consoleRows)renderConsoleSelectors(state.consoleRows);renderRepos();}
 function themeApply(){document.body.dataset.theme=theme;$("theme").value=theme;localStorage.setItem("radar-theme",theme);}
 for(const [code,name] of Object.entries(localeNames)){$("locale").add(new Option(name,code));}
 $("locale").addEventListener("change",e=>{locale=e.target.value;localStorage.setItem("radar-locale",locale);localized();});
 $("theme").addEventListener("change",e=>{theme=e.target.value;themeApply();});
 themeApply();
 const number=n=>n>=1000?(n/1000).toFixed(1)+"k":String(n??0);
-function renderCategories(){$("categories").replaceChildren(...categoryKeys.map(key=>{const b=document.createElement("button");b.className="chip"+(state.category===key?" active":"");const count=key==="all"?state.catalogTotal:(state.categoryCounts[key]??0);b.textContent=state.categoryCountsLoaded?`${t(key)} · ${Number(count).toLocaleString(locale)}`:t(key);b.type="button";b.onclick=()=>{state.category=key;renderCategories();loadRepos(true);};return b;}));}
+function renderCategories(){
+ $("console-filters").classList.toggle("hidden",state.category!=="console_webkit");
+ $("categories").replaceChildren(...categoryKeys.map(key=>{const b=document.createElement("button");b.className="chip"+(state.category===key?" active":"");const count=key==="all"?state.catalogTotal:(state.categoryCounts[key]??0);b.textContent=state.categoryCountsLoaded?`${t(key)} · ${Number(count).toLocaleString(locale)}`:t(key);b.type="button";b.onclick=()=>{state.category=key;renderCategories();loadRepos(true);};return b;}));
+}
+const consoleControls=[
+ ["console-model","console","anyConsole","consoles"],
+ ["console-version","version","anyVersion","versions"],
+ ["console-firmware-version","firmwareVersion","anyFirmwareVersion","firmwareVersions"],
+ ["console-firmware-type","firmwareType","anyFirmwareType","firmwareTypes"]
+];
+function renderConsoleSelectors(rows){
+ const options=consoleFacetOptions(rows,state.consoleFilters.console);
+ for(const [id,key,labelKey,optionKey] of consoleControls){
+  const el=$(id),values=options[optionKey],current=state.consoleFilters[key];
+  const items=[new Option(t(labelKey),"")];
+  if(key!=="console"||rows.some(r=>!consoleMetadata(r).consoles.length))items.push(new Option(t("unspecified"),"__unknown__"));
+  for(const name of values)items.push(new Option(name,name));
+  el.replaceChildren(...items);
+  if(current && (current==="__unknown__"||values.includes(current)))el.value=current;
+  else{state.consoleFilters[key]="";el.value="";}
+ }
+}
+let consoleCachePromise=null,consoleCacheAt=0;
+async function fetchConsoleRows(){
+ if(!consoleCachePromise||Date.now()-consoleCacheAt>5*60*1000){
+  consoleCacheAt=Date.now();
+  consoleCachePromise=(async()=>{
+   const rows=[],batch=500;
+   for(let start=0;;start+=batch){
+    const {data,error}=await sb.from("repos").select("id,name,owner_login,full_name,description,html_url,language,topics,stars,license_spdx,category,pushed_at,created_at,forks_count,homepage")
+     .eq("category","console_webkit").eq("is_fork",false).eq("is_archived",false).order("id").range(start,start+batch-1);
+    if(error)throw error;
+    rows.push(...(data||[]));
+    if(!data||data.length<batch)break;
+   }
+   return rows;
+  })().catch(err=>{consoleCachePromise=null;throw err;});
+ }
+ return consoleCachePromise;
+}
+for(const [id,key] of consoleControls){
+ $(id).onchange=e=>{state.consoleFilters[key]=e.target.value;loadRepos(true);};
+}
 async function updateCategoryCounts(){if(state.categoryCountsLoaded)return;try{const{data,error}=await sb.rpc("list_repo_category_counts");if(error)throw error;state.categoryCounts=Object.fromEntries((data||[]).map(row=>[row.category,Number(row.total)]));state.catalogTotal=Object.values(state.categoryCounts).reduce((sum,value)=>sum+value,0);state.categoryCountsLoaded=true;renderCategories();}catch(error){console.warn("Repository category counts unavailable:",error.message);state.categoryCountsLoaded=false;}}
 const REPO_PAGE_SIZE=48;
 async function updateLanguageOptions(){if(!state.languageOptionsLoaded){const{data,error}=await sb.rpc("list_repo_languages");if(error){console.warn("Language list unavailable:",error.message);state.languageOptions=[...new Set(state.allRows.map(r=>r.language).filter(Boolean))].sort((a,b)=>a.localeCompare(b));}else{state.languageOptions=(data||[]).map(row=>row.language).filter(Boolean);}state.languageOptionsLoaded=true;}const select=$("language"),current=state.language;const names=state.languageOptions.slice();if(current&&!names.includes(current))names.unshift(current);select.replaceChildren(new Option(t("allLanguages"),""));for(const name of names)select.add(new Option(name,name));select.value=current;}
 function renderRepos(){const rows=state.allRows;const frag=document.createDocumentFragment();if(!rows.length){const empty=document.createElement("div");empty.className="empty";empty.textContent=t("noProjects");frag.append(empty);}
-for(const r of rows){const card=document.createElement("article");card.className="repo-card";const title=document.createElement("a");title.className="repo-title";title.textContent=r.name;try{const url=new URL(r.html_url);if(url.protocol==="https:"&&url.hostname==="github.com"){title.href=url.href;title.target="_blank";title.rel="noopener noreferrer";}}catch{}const desc=document.createElement("p");desc.className="repo-desc";desc.textContent=r.description||t("noDescription");const meta=document.createElement("div");meta.className="repo-meta";
+for(const r of rows){const card=document.createElement("article");card.className="repo-card";const title=document.createElement("a");title.className="repo-title";title.textContent=r.name;try{const url=new URL(r.html_url);if(url.protocol==="https:"&&url.hostname==="github.com"){title.href=url.href;title.target="_blank";title.rel="noopener noreferrer";}}catch{}const descWrap=document.createElement("div");descWrap.className="repo-description-wrap";
+const desc=document.createElement("p");desc.className="repo-desc";
+const fullDescription=String(r.description||"");
+const characters=Array.from(fullDescription);
+const hasLongDescription=characters.length>350;
+const preview=hasLongDescription?characters.slice(0,300).join("").trimEnd()+"…":fullDescription||t("noDescription");
+desc.textContent=preview;
+descWrap.append(desc);
+if(hasLongDescription){
+ const toggle=document.createElement("button");
+ toggle.className="description-toggle";toggle.type="button";
+ toggle.setAttribute("aria-expanded","false");toggle.textContent=t("expandDescription");
+ toggle.onclick=()=>{
+  const expanded=toggle.getAttribute("aria-expanded")==="true";
+  toggle.setAttribute("aria-expanded",expanded?"false":"true");
+  desc.textContent=expanded?preview:fullDescription;
+  desc.classList.toggle("expanded",!expanded);
+  toggle.textContent=t(expanded?"expandDescription":"collapseDescription");
+ };
+ descWrap.append(toggle);
+}
+const meta=document.createElement("div");meta.className="repo-meta";
 const things=[[r.owner_login,"repo-owner"],[r.language,"repo-tag"],["★ "+number(r.stars)],r.license_spdx?[r.license_spdx]:null,r.pushed_at?[new Date(r.pushed_at).toLocaleDateString(locale)]:null].filter(Boolean);
 for(const [str,cls] of things){const item=document.createElement("span");if(cls)item.className=cls;item.textContent=str;meta.append(item);}
+if(r.category==="console_webkit"){
+ const info=consoleMetadata(r),tags=[...info.consoles];
+ if(info.projectVersion)tags.push(info.projectVersion);
+ for(const fw of info.firmwareVersions)tags.push(`${t("firmwareVersion")}: ${fw}`);
+ tags.push(...info.firmwareTypes);
+ for(const tag of tags){const el=document.createElement("span");el.className="repo-tag";el.textContent=tag;meta.append(el);}
+}
 if(r.full_name?.toLowerCase()==="peteroxhka/repo-radar"){const badge=document.createElement("span");badge.className="official-project-tag";badge.textContent=t("officialRadar");card.append(badge);}
-card.append(title,desc,meta);
+card.append(title,descWrap,meta);
 const projectSite=trustedGitHubPagesSite(r.site_url)||featuredSiteLinks[r.full_name?.toLowerCase()];
 if(projectSite){const site=document.createElement("a");site.className="project-site-link";site.href=projectSite;site.target="_blank";site.rel="noopener noreferrer";site.textContent=t("visitSite");card.append(site);}
 frag.append(card);} $("grid").replaceChildren(frag);}
@@ -77,6 +165,26 @@ setStatus("status",t("loading"));
 try{
 await updateCategoryCounts();
 if(requestId!==state.listRequestId)return;
+if(state.category==="console_webkit"){
+ const all=await fetchConsoleRows();
+ if(requestId!==state.listRequestId)return;
+ state.consoleRows=all;renderConsoleSelectors(all);
+ const filtered=sortConsoleProjects(filterConsoleProjects(all,{
+  search:normalizeSearch(state.search),language:state.language,includeDescription:state.includeDescription,
+  ...state.consoleFilters
+ }),state.sort);
+ const page=filtered.slice(offset,offset+REPO_PAGE_SIZE).map(r=>({...r,site_url:trustedGitHubPagesSite(r.homepage)}));
+ state.allRows=reset?page:state.allRows.concat(page);
+ state.totalCount=filtered.length;
+ state.hasMore=state.allRows.length<state.totalCount;
+ $("repo-count").textContent=state.totalCount.toLocaleString(locale);
+ await updateLanguageOptions();
+ if(requestId!==state.listRequestId)return;
+ renderRepos();
+ more.hidden=!state.hasMore;$("load-more-wrap").hidden=!state.hasMore;
+ setStatus("status",`${state.allRows.length.toLocaleString(locale)} / ${state.totalCount.toLocaleString(locale)}`);
+ return;
+}
 const{data,error}=await sb.rpc("search_catalog",{
  q:normalizeSearch(state.search),category_filter:state.category,
  language_filter:state.language,sort_by:state.sort,
