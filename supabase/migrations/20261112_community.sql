@@ -1,6 +1,8 @@
 -- Repo Radar community schema. Execute in Supabase SQL Editor before enabling chat.
 -- In Settings > API > Exposed schemas include repo_radar. Do not expose service_role keys.
 create schema if not exists repo_radar;
+create schema if not exists repo_radar_private;
+revoke all on schema repo_radar_private from public, anon, authenticated;
 grant usage on schema repo_radar to authenticated;
 
 create table if not exists repo_radar.profiles (
@@ -19,7 +21,7 @@ drop policy if exists "profiles update own" on repo_radar.profiles;
 create policy "profiles update own" on repo_radar.profiles for update to authenticated
 using (id = (select auth.uid())) with check (id = (select auth.uid()));
 
-create or replace function repo_radar.create_profile_for_new_user()
+create or replace function repo_radar_private.create_profile_for_new_user()
 returns trigger language plpgsql security definer set search_path = ''
 as $$
 declare
@@ -44,8 +46,8 @@ end;
 $$;
 drop trigger if exists repo_radar_on_auth_user_created on auth.users;
 create trigger repo_radar_on_auth_user_created
-after insert on auth.users for each row execute function repo_radar.create_profile_for_new_user();
-revoke all on function repo_radar.create_profile_for_new_user() from public, anon, authenticated;
+after insert on auth.users for each row execute function repo_radar_private.create_profile_for_new_user();
+revoke all on function repo_radar_private.create_profile_for_new_user() from public, anon, authenticated;
 
 insert into repo_radar.profiles(id, username, avatar_url)
 select id,'u_' || substr(replace(id::text,'-',''),1,20),raw_user_meta_data->>'avatar_url'
