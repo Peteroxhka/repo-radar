@@ -273,7 +273,7 @@ function setStatus(id,message,isError=false){const el=$(id);if(!el)return;el.tex
 function safeErr(e){console.error("Repo Radar:",e);return e?.message||t("error");}
 function localized(){document.documentElement.lang=locale;document.documentElement.dir=locale==="ar"?"rtl":"ltr";
 document.querySelectorAll("[data-i18n]").forEach(el=>{const key=el.dataset.i18n;if(key==="headline")el.innerHTML=t(key);else el.textContent=t(key);});
-$("repo-search").placeholder=t("repoSearch");$("user-search").placeholder=t("userSearch");$("message-input").placeholder=t("messagePlaceholder");if($("language").options.length)$("language").options[0].textContent=t("allLanguages");
+$("repo-search").placeholder=locale==="ru"?"Название, owner/repo или @ник":"Name, owner/repo or @username";$("user-search").placeholder=t("userSearch");$("message-input").placeholder=t("messagePlaceholder");if($("language").options.length)$("language").options[0].textContent=t("allLanguages");
 $("auth-title").textContent=state.register?t("register"):t("welcomeBack");$("auth-submit").textContent=state.register?t("register"):t("signIn");$("auth-switch").textContent=state.register?t("alreadyAccount"):t("needAccount");
 $("locale").value=locale;renderCategories();if(state.consoleRows)renderConsoleSelectors(state.consoleRows);renderRepos();}
 function themeApply(){document.body.dataset.theme=theme;$("theme").value=theme;localStorage.setItem("radar-theme",theme);}
