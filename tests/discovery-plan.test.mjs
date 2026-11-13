@@ -39,11 +39,14 @@ test("invalid inputs do not create dangerous GitHub searches",()=>{
  assert.throws(()=>buildDiscoveryPlan(BASE,2.5));
 });
 
-test("backfill scans eight new completed UTC days per hourly slot within the GitHub result cap",()=>{
+test("backfill scans recent and historical UTC days per hourly slot within the GitHub result cap",()=>{
  const slot=discoverySlot("2026-11-13T00:00:00Z");
  const first=buildBackfillPlan(slot);
  assert.deepEqual(first.slice(0,10).map(job=>job.page),[1,2,3,4,5,6,7,8,9,10]);
  assert.ok(first.slice(0,10).every(job=>job.search==="created:2026-11-12 size:>=3"));
- assert.equal(new Set(first.map(job=>job.search)).size,8);
+ assert.equal(new Set(first.map(job=>job.search)).size,11);
+ assert.ok(first.some(job=>job.search.startsWith("created:2013-")));
+ assert.ok(first.some(job=>job.search.startsWith("created:2017-")));
+ assert.ok(first.some(job=>job.search.startsWith("created:2021-")));
  assert.equal(buildBackfillPlan(slot+1)[0].search,"created:2026-11-04 size:>=3");
 });

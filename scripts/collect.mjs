@@ -188,7 +188,8 @@ async function syncFeaturedOriginals(){
 async function syncTrackedOwners(){
  for(const owner of trackedOwners){
   const entries=[],observed=new Set();
-  for(let page=1;page<=3;page++){
+  // GitHub Search exposes up to 1,000 matches in ten pages of 100.
+  for(let page=1;page<=10;page++){
    const query=`user:${owner} fork:false archived:false`;
    const url=`${API}/search/repositories?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=100&page=${page}`;
    const response=await getJson(url),repos=response.items||[];
