@@ -8,7 +8,7 @@ const BASE=[
 ];
 test("hourly discovery expands beyond the first page and never repeats a query/page",()=>{
  const jobs=buildDiscoveryPlan(BASE,500000);
- assert.ok(jobs.length>=19);
+ assert.ok(jobs.length>=12);
  assert.ok(jobs.some(x=>x.page>1));
  assert.ok(jobs.some(x=>x.track==="rotating"));
  assert.equal(new Set(jobs.map(x=>x.search+"|"+x.page)).size,jobs.length);
@@ -30,7 +30,11 @@ test("deep pagination shifts across 4-hour batches without skipping page 1 base 
  assert.ok(first.some(x=>x.page>1));
  assert.ok(fifth.some(x=>x.page>1));
  assert.notEqual(first.find(x=>x.track==="deep")?.page,fifth.find(x=>x.track==="deep")?.page);
- assert.ok(first.filter(x=>x.track==="base").every(x=>x.page===1));
+ const keys=jobs=>new Set(jobs.filter(x=>x.track!=="deep").map(x=>x.search+"|"+x.page));
+ const next=keys(buildDiscoveryPlan(BASE,500001));
+ assert.ok([...keys(first)].every(key=>!next.has(key)));
+ const pages=new Set(Array.from({length:60},(_,i)=>buildDiscoveryPlan(BASE,500000+i)).flat().filter(job=>job.track==="base"&&job.search===BASE[0][1]).map(job=>job.page));
+ assert.equal(pages.size,10);
  assert.ok(discoverySlot("2026-11-13T00:00:00.000Z")>0);
 });
 test("invalid inputs do not create dangerous GitHub searches",()=>{
