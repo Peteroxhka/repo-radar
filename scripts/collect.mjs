@@ -211,8 +211,13 @@ async function syncTrackedOwners(){
   console.log(`Tracked @${owner}: ${fresh.length} new meaningful projects, ${existing.size} duplicates skipped`);
  }
 }
-await syncFeaturedOriginals();
-await syncTrackedOwners();
+const lane=process.env.COLLECTOR_LANE||"all";
+if(!["all","topics","history"].includes(lane))throw Error("Unknown collector lane");
+const searchDelay=lane==="all"?2400:5000;
+if(lane!=="history"){
+ await syncFeaturedOriginals();
+ await syncTrackedOwners();
+}
 if(process.argv.includes("--featured-only")){
  console.log("Curated projects and public owned repositories synchronized.");
  process.exit(0);
@@ -220,7 +225,11 @@ if(process.argv.includes("--featured-only")){
 
 const recent=discoverySlot();
 const sort=recent%3===0?"updated":"stars";
-const jobs=[...buildBackfillPlan(recent),...buildDiscoveryPlan([...QUERIES,...consoleDiscoveryQueries],recent)];
+const jobs=[
+ ...(lane==="topics"?[]:buildBackfillPlan(recent)),
+ ...(lane==="history"?[]:buildDiscoveryPlan([...QUERIES,...consoleDiscoveryQueries],recent)),
+];
+console.log(`Collector lane: ${lane}`);
 const backfillExhausted=new Set();
 console.log(`Discovery plan: ${jobs.length} searches, ${jobs.filter(x=>x.track==="rotating").length} rotating topics, ${jobs.filter(x=>x.track==="deep").length} deeper pages, sorting by ${sort}`);
 let successful=0,failed=0,skippedInRun=0,skippedExisting=0,inserted=0;
@@ -235,7 +244,7 @@ for(const {category,search,page,track} of jobs){
   if(track==="backfill"&&(results.items?.length??0)<100)backfillExhausted.add(search);
  }catch(error){
   failed++;console.error(`Search failed (${search} page ${page}): ${error.message}`);
-  await sleep(2400);continue;
+  await sleep(searchDelay);continue;
  }
  const candidates=[];
  for(const repo of results.items||[]){
@@ -273,7 +282,7 @@ for(const {category,search,page,track} of jobs){
  for(const item of fresh)knownIds.add(item.id);
  inserted+=fresh.length;
  console.log(`[${track}] ${search} page ${page}: ${results.items?.length||0} matches, ${fresh.length} new, ${existing.size} already in database`);
- await sleep(2400);
+ await sleep(searchDelay);
 }
 if(successful===0||successful<Math.ceil((successful+failed)*.7))
  throw new Error(`Discovery incomplete: ${successful}/${successful+failed} searches succeeded, ${failed} failed.`);

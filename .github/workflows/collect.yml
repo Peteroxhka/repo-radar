@@ -21,12 +21,16 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: repo-radar-public-catalog
-  cancel-in-progress: false
-
 jobs:
   collect:
+    name: Collect (${{ matrix.lane }})
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [topics, history]
+    concurrency:
+      group: repo-radar-public-catalog-${{ matrix.lane }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 55
     steps:
@@ -43,6 +47,7 @@ jobs:
           node --test tests/discovery-plan.test.mjs tests/repo-quality.test.mjs tests/collector-guard.test.mjs tests/featured-repositories.test.mjs
       - name: Collect public GitHub catalog
         env:
+          COLLECTOR_LANE: ${{ matrix.lane }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SUPABASE_URL: https://tlqsmwsjeogudgijnpnu.supabase.co
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
