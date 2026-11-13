@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {featuredOriginals,trackedOwners,consoleDiscoveryQueries} from "../lib/featured-repositories.mjs";
 test("submitted and owner projects are uniquely identified by full GitHub names",()=>{
- assert.equal(featuredOriginals.length,18);
+ assert.equal(featuredOriginals.length,22);
  const names=featuredOriginals.map(x=>x.fullName.toLowerCase());
  assert.equal(new Set(names).size,names.length);
  assert.ok(names.includes("peteroxhka/consolewebkit"));
