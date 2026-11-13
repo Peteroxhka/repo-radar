@@ -37,3 +37,9 @@ test("invalid repository metadata cannot reach storage",()=>{
  assert.equal(assessProject(repo({id:-1})).eligible,false);
  assert.equal(assessProject(repo({full_name:"bad/owner/name"})).eligible,false);
 });
+
+test("only forks with at least 50 stars that pass quality checks are eligible",()=>{
+ assert.equal(assessProject(repo({fork:true,stargazers_count:49})).eligible,false);
+ assert.equal(assessProject(repo({fork:true,stargazers_count:50})).eligible,true);
+ assert.equal(assessProject(repo({fork:true,stargazers_count:50,size:0})).eligible,false);
+});

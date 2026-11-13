@@ -1,6 +1,6 @@
 // Curated discovery from GitHub search. Never bulk-import incomplete /repositories entries.
 import {isConsoleWebKit, trustedGitHubPagesSite} from "../lib/catalog.mjs";
-import {buildDiscoveryPlan,buildBackfillPlan,discoverySlot} from "../lib/discovery-plan.mjs";
+import {buildDiscoveryPlan,buildBackfillPlan,buildPopularForkPlan,discoverySlot} from "../lib/discovery-plan.mjs";
 import {assessProject} from "../lib/repo-quality.mjs";
 import {featuredOriginals,trackedOwners,consoleDiscoveryQueries} from "../lib/featured-repositories.mjs";
 const API="https://api.github.com";
@@ -91,7 +91,7 @@ function row(repo,category){
  stars:repo.stargazers_count||0,license_spdx:repo.license?.spdx_id||null,
  category:classify(repo,category),pushed_at:repo.pushed_at||null,
  created_at:repo.created_at||null,fetched_at:new Date().toISOString(),
- is_fork:false,is_archived:false,forks_count:repo.forks_count||0,
+ is_fork:Boolean(repo.fork),is_archived:false,forks_count:repo.forks_count||0,
  watchers_count:repo.subscribers_count||0,open_issues_count:repo.open_issues_count||0,
  default_branch:repo.default_branch||null,homepage:repo.homepage||null,
  updated_at:repo.updated_at||null};
@@ -228,6 +228,7 @@ const sort=recent%3===0?"updated":"stars";
 const jobs=[
  ...(lane==="topics"?[]:buildBackfillPlan(recent)),
  ...(lane==="history"?[]:buildDiscoveryPlan([...QUERIES,...consoleDiscoveryQueries],recent)),
+ ...(lane==="history"?[]:buildPopularForkPlan(recent)),
 ];
 console.log(`Collector lane: ${lane}`);
 const backfillExhausted=new Set();
@@ -235,7 +236,7 @@ console.log(`Discovery plan: ${jobs.length} searches, ${jobs.filter(x=>x.track==
 let successful=0,failed=0,skippedInRun=0,skippedExisting=0,inserted=0;
 for(const {category,search,page,track} of jobs){
  if(track==="backfill"&&backfillExhausted.has(search))continue;
- const q=`${search} is:public fork:false archived:false stars:>=${track==="backfill"?1:2}`;
+ const q=`${search} is:public ${track==="popular-forks"?"fork:only":"fork:false"} archived:false stars:>=${track==="popular-forks"?50:track==="backfill"?1:2}`;
  const url=`${API}/search/repositories?q=${encodeURIComponent(q)}&sort=${track==="backfill"?"stars":sort}&order=desc&per_page=100&page=${page}`;
  let results;
  try{

@@ -311,8 +311,8 @@ async function fetchConsoleRows(){
   consoleCachePromise=(async()=>{
    const rows=[],batch=500;
    for(let start=0;;start+=batch){
-    const {data,error}=await sb.from("repos").select("id,name,owner_login,full_name,description,html_url,language,topics,stars,license_spdx,category,pushed_at,created_at,forks_count,homepage")
-     .eq("category","console_webkit").eq("is_fork",false).eq("is_archived",false).eq("admin_hidden",false).order("id").range(start,start+batch-1);
+    const {data,error}=await sb.from("repos").select("id,name,owner_login,full_name,description,html_url,language,topics,stars,license_spdx,category,pushed_at,created_at,forks_count,homepage,is_fork")
+     .eq("category","console_webkit").or("is_fork.eq.false,stars.gte.50").eq("is_archived",false).eq("admin_hidden",false).order("id").range(start,start+batch-1);
     if(error)throw error;
     rows.push(...(data||[]));
     if(!data||data.length<batch)break;
@@ -351,7 +351,7 @@ if(hasLongDescription){
  descWrap.append(toggle);
 }
 const meta=document.createElement("div");meta.className="repo-meta";
-const things=[[r.owner_login,"repo-owner"],[r.language,"repo-tag"],["★ "+number(r.stars)],r.license_spdx?[r.license_spdx]:null,r.pushed_at?[new Date(r.pushed_at).toLocaleDateString(locale)]:null].filter(Boolean);
+const things=[[r.owner_login,"repo-owner"],r.is_fork?[locale==="ru"?"Форк":"Fork","repo-tag"]:null,[r.language,"repo-tag"],["★ "+number(r.stars)],r.license_spdx?[r.license_spdx]:null,r.pushed_at?[new Date(r.pushed_at).toLocaleDateString(locale)]:null].filter(Boolean);
 for(const [str,cls] of things){const item=document.createElement("span");if(cls)item.className=cls;item.textContent=str;meta.append(item);}
 if(r.category==="console_webkit"){
  const info=consoleMetadata(r),tags=[...info.consoles];
@@ -482,15 +482,22 @@ if(requestId!==state.listRequestId)return;
 if(error)throw error;
 const page=data||[];
 let siteById=new Map();
+let forkIds=new Set();
 if(page.length){
  try{
-  const {data:sites,error:sitesError}=await sb.rpc("list_catalog_sites",{repo_ids:page.map(r=>r.id)});
+  const ids=page.map(r=>r.id);
+  const [sitesResult,forksResult]=await Promise.all([
+   sb.rpc("list_catalog_sites",{repo_ids:ids}),
+   sb.from("repos").select("id").in("id",ids).eq("is_fork",true),
+  ]);
+  if(!forksResult.error)forkIds=new Set((forksResult.data||[]).map(r=>String(r.id)));
+  const {data:sites,error:sitesError}=sitesResult;
   if(sitesError)throw sitesError;
   siteById=new Map((sites||[]).map(r=>[String(r.id),trustedGitHubPagesSite(r.homepage)]).filter(([,url])=>!!url));
  }catch(siteError){console.warn("GitHub Pages links unavailable:",siteError.message);}
 }
 if(requestId!==state.listRequestId)return;
-const enriched=page.map(r=>({...r,site_url:siteById.get(String(r.id))||null}));
+const enriched=page.map(r=>({...r,is_fork:forkIds.has(String(r.id)),site_url:siteById.get(String(r.id))||null}));
 state.allRows=reset?enriched:state.allRows.concat(enriched);
 state.totalCount=Number(page[0]?.total_count??(reset?0:state.totalCount));
 state.hasMore=page.length===REPO_PAGE_SIZE&&state.allRows.length<state.totalCount;
