@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {buildDiscoveryPlan,discoverySlot,ROTATING_DISCOVERY} from "../lib/discovery-plan.mjs";
+import {buildBackfillPlan,buildDiscoveryPlan,discoverySlot,ROTATING_DISCOVERY} from "../lib/discovery-plan.mjs";
 const BASE=[
  ["tools","topic:developer-tools"],["ai","topic:llm"],
  ["data","topic:database"],["web","topic:frontend"],
@@ -37,4 +37,13 @@ test("invalid inputs do not create dangerous GitHub searches",()=>{
  assert.throws(()=>buildDiscoveryPlan([["bad","topic:any"]],500000));
  assert.throws(()=>buildDiscoveryPlan([["tools",""]],500000));
  assert.throws(()=>buildDiscoveryPlan(BASE,2.5));
+});
+
+test("backfill scans eight new completed UTC days per hourly slot within the GitHub result cap",()=>{
+ const slot=discoverySlot("2026-11-13T00:00:00Z");
+ const first=buildBackfillPlan(slot);
+ assert.deepEqual(first.slice(0,10).map(job=>job.page),[1,2,3,4,5,6,7,8,9,10]);
+ assert.ok(first.slice(0,10).every(job=>job.search==="created:2026-11-12 size:>=3"));
+ assert.equal(new Set(first.map(job=>job.search)).size,8);
+ assert.equal(buildBackfillPlan(slot+1)[0].search,"created:2026-11-04 size:>=3");
 });

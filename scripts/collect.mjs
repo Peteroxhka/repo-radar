@@ -1,6 +1,6 @@
 // Curated discovery from GitHub search. Never bulk-import incomplete /repositories entries.
 import {isConsoleWebKit, trustedGitHubPagesSite} from "../lib/catalog.mjs";
-import {buildDiscoveryPlan,discoverySlot} from "../lib/discovery-plan.mjs";
+import {buildDiscoveryPlan,buildBackfillPlan,discoverySlot} from "../lib/discovery-plan.mjs";
 import {assessProject} from "../lib/repo-quality.mjs";
 import {featuredOriginals,trackedOwners,consoleDiscoveryQueries} from "../lib/featured-repositories.mjs";
 const API="https://api.github.com";
@@ -219,16 +219,19 @@ if(process.argv.includes("--featured-only")){
 
 const recent=discoverySlot();
 const sort=recent%3===0?"updated":"stars";
-const jobs=buildDiscoveryPlan([...QUERIES,...consoleDiscoveryQueries],recent);
+const jobs=[...buildBackfillPlan(recent),...buildDiscoveryPlan([...QUERIES,...consoleDiscoveryQueries],recent)];
+const backfillExhausted=new Set();
 console.log(`Discovery plan: ${jobs.length} searches, ${jobs.filter(x=>x.track==="rotating").length} rotating topics, ${jobs.filter(x=>x.track==="deep").length} deeper pages, sorting by ${sort}`);
 let successful=0,failed=0,skippedInRun=0,skippedExisting=0,inserted=0;
 for(const {category,search,page,track} of jobs){
- const q=`${search} fork:false archived:false stars:>=2`;
- const url=`${API}/search/repositories?q=${encodeURIComponent(q)}&sort=${sort}&order=desc&per_page=100&page=${page}`;
+ if(track==="backfill"&&backfillExhausted.has(search))continue;
+ const q=`${search} is:public fork:false archived:false stars:>=${track==="backfill"?1:2}`;
+ const url=`${API}/search/repositories?q=${encodeURIComponent(q)}&sort=${track==="backfill"?"stars":sort}&order=desc&per_page=100&page=${page}`;
  let results;
  try{
   results=await getJson(url);
   successful++;
+  if(track==="backfill"&&(results.items?.length??0)<100)backfillExhausted.add(search);
  }catch(error){
   failed++;console.error(`Search failed (${search} page ${page}): ${error.message}`);
   await sleep(2400);continue;
@@ -271,6 +274,6 @@ for(const {category,search,page,track} of jobs){
  console.log(`[${track}] ${search} page ${page}: ${results.items?.length||0} matches, ${fresh.length} new, ${existing.size} already in database`);
  await sleep(2400);
 }
-if(successful===0||successful<Math.ceil(jobs.length*.7))
- throw new Error(`Discovery incomplete: ${successful}/${jobs.length} searches succeeded, ${failed} failed.`);
-console.log(`Discovery complete: ${inserted} new repositories, ${skippedExisting} existing IDs, ${skippedInRun} repeats within run; ${successful}/${jobs.length} queries succeeded. Quality exclusions: ${JSON.stringify(Object.fromEntries(qualityStats))}. No existing data overwritten.`);
+if(successful===0||successful<Math.ceil((successful+failed)*.7))
+ throw new Error(`Discovery incomplete: ${successful}/${successful+failed} searches succeeded, ${failed} failed.`);
+console.log(`Discovery complete: ${inserted} new repositories, ${skippedExisting} existing IDs, ${skippedInRun} repeats within run; ${successful}/${successful+failed} queries succeeded. Quality exclusions: ${JSON.stringify(Object.fromEntries(qualityStats))}. No existing data overwritten.`);
