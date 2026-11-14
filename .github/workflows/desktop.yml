@@ -34,10 +34,13 @@ jobs:
             $log = Join-Path $env:TEMP "RepoRadar-smoke-error.txt"
             if (Test-Path $log) { Get-Content $log }
             throw "Catalog smoke test failed: $($test.ExitCode)" }
+      - name: Stage window preview
+        shell: pwsh
+        run: Copy-Item (Join-Path ([System.IO.Path]::GetTempPath()) "RepoRadar-preview.png") "./publish/RepoRadar-preview.png" -ErrorAction Stop
       - uses: actions/upload-artifact@v4
         with:
           name: RepoRadar-Windows-preview
-          path: ${{ runner.temp }}/RepoRadar-preview.png
+          path: publish/RepoRadar-preview.png
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
