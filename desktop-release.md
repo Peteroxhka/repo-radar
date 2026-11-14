@@ -1,1 +1,1 @@
-Native Windows x64 client with a new desktop layout: category sidebar, prominent search, two-column project cards, and Auto, Dark, Light and Cosmic themes. Download and run RepoRadar.exe. Account and chat remain on the website.
+Native Windows x64 client. New three-pane layout with searchable categories, a fixed search and filter area, and responsive repository cards. Download RepoRadar.exe. Account and chat are available on the website.

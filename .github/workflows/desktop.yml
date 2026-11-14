@@ -36,6 +36,11 @@ jobs:
             throw "Catalog smoke test failed: $($test.ExitCode)" }
       - uses: actions/upload-artifact@v4
         with:
+          name: RepoRadar-Windows-preview
+          path: ${{ runner.temp }}/RepoRadar-preview.png
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
           name: RepoRadar-Windows-x64
           path: publish/RepoRadar.exe
           if-no-files-found: error
@@ -45,10 +50,10 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: desktop-v0.3.0
+          RELEASE_TAG: desktop-v0.4.0
         run: |
           $tags = gh release list --limit 100 --json tagName --jq '.[].tagName'
           if ($LASTEXITCODE -ne 0) { throw "Could not check existing releases" }
           if ($tags -contains $env:RELEASE_TAG) { return }
-          gh release create $env:RELEASE_TAG ./publish/RepoRadar.exe --target "$env:GITHUB_SHA" --title "Repo Radar for Windows v0.3.0" --notes-file desktop-release.md
+          gh release create $env:RELEASE_TAG ./publish/RepoRadar.exe --target "$env:GITHUB_SHA" --title "Repo Radar for Windows v0.4.0" --notes-file desktop-release.md
           if ($LASTEXITCODE -ne 0) { throw "Release publication failed" }

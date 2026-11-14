@@ -15,8 +15,8 @@ internal static class Program
             {
                 var rows = CatalogClient.SearchAsync("@Peteroxhka", "all", "", "popular", 0, CancellationToken.None)
                     .GetAwaiter().GetResult();
-                using var window = new CatalogWindow();
-                window.CreateControl();
+                using var window = new CatalogWindow(loadOnShow: false);
+                window.VerifyLayout(rows);
                 return rows.Any(row => row.FullName.Equals("Peteroxhka/repo-radar", StringComparison.OrdinalIgnoreCase)) ? 0 : 2;
             }
             catch (Exception error)
@@ -58,25 +58,43 @@ internal sealed class CatalogWindow : Form
     private (string Query, string Category, string Language, string Sort, bool Description) active;
     private Color background, surface, raised, foreground, muted, accent, accentText;
 
-    public CatalogWindow()
+    public CatalogWindow(bool loadOnShow = true)
     {
         Text = "Repo Radar";
-        ClientSize = new(1200, 820);
-        MinimumSize = new(820, 560);
+        ClientSize = new(1280, 820);
+        MinimumSize = new(900, 560);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 10);
         AutoScaleMode = AutoScaleMode.Dpi;
         page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         scroll.Controls.Add(page);
-        var shell = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
-        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 206));
+        var shell = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, Margin = Padding.Empty };
+        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 74));
+        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 284));
         shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         sidebar.Dock = DockStyle.Fill;
         sidebar.Margin = Padding.Empty;
         sidebar.AutoScroll = true;
         sidebar.Padding = new(16, 18, 12, 12);
-        shell.Controls.Add(sidebar, 0, 0);
-        shell.Controls.Add(scroll, 1, 0);
+        var rail = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty, Tag = "rail" };
+        var brand = MakeButton("R.", () => query.Focus(), true);
+        brand.Dock = DockStyle.Top;
+        brand.Height = 62;
+        brand.Font = new Font("Segoe UI", 17, FontStyle.Bold);
+        var settings = MakeButton("⚙", () => theme.Focus());
+        settings.AccessibleName = "Выбор темы";
+        settings.Dock = DockStyle.Bottom;
+        settings.Height = 52;
+        rail.Controls.Add(brand);
+        rail.Controls.Add(settings);
+        var workspace = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = Padding.Empty };
+        workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        workspace.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        workspace.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        workspace.Controls.Add(scroll, 0, 1);
+        shell.Controls.Add(rail, 0, 0);
+        shell.Controls.Add(sidebar, 1, 0);
+        shell.Controls.Add(workspace, 2, 0);
         Controls.Add(shell);
 
         theme.Items.AddRange(["Авто", "Тёмная", "Светлая", "Космос"]);
@@ -88,57 +106,64 @@ internal sealed class CatalogWindow : Form
         sort.Items.AddRange(["Популярные","Меньше звёзд","Недавно обновлённые","Новые","Больше форков"]);
         sort.SelectedIndex = 0;
         var find = MakeButton("Найти", primary: true);
-        sidebar.Controls.Add(MakeLabel("Repo Radar", 18, true));
-        sidebar.Controls.Add(MakeLabel("Категории", 10, tone: "muted"));
+        sidebar.Controls.Add(MakeLabel("Категории", 20, true));
+        var categorySearch = new TextBox { Width = 224, PlaceholderText = "Найти категорию", AccessibleName = "Найти категорию" };
+        sidebar.Controls.Add(categorySearch);
         chips.Dock = DockStyle.None;
         chips.FlowDirection = FlowDirection.TopDown;
         chips.WrapContents = false;
         sidebar.Controls.Add(chips);
+        string[] marks = ["◈", "✦", "⌘", "‹›", "◎", "▤", "◇", "▧", "▣", "···"];
         for (var i = 0; i < Names.Length; i++)
         {
             var index = i;
-            var chip = MakeButton(i == 0 ? "Все проекты" : Names[i]);
+            var name = i == 0 ? "Все проекты" : Names[i];
+            var chip = MakeButton(name);
+            chip.AccessibleName = name;
             chip.AutoSize = false;
-            chip.Size = new(155, 33);
+            chip.Size = new(224, 42);
             chip.TextAlign = ContentAlignment.MiddleLeft;
             chip.Margin = new(0, 0, 0, 3);
+            if (chip is RadarButton categoryButton) categoryButton.Mark = marks[i];
             chip.Click += async (_, _) =>
             {
                 selectedCategory = index;
-                sectionTitle.Text = index == 0 ? "Все проекты" : Names[index];
+                sectionTitle.Text = name;
                 PaintTheme(this);
+                scroll.AutoScrollPosition = Point.Empty;
                 await LoadPage(true);
             };
             chips.Controls.Add(chip);
         }
+        categorySearch.TextChanged += (_, _) =>
+        {
+            foreach (Control chip in chips.Controls)
+                chip.Visible = chip.Text.Contains(categorySearch.Text.Trim(), StringComparison.CurrentCultureIgnoreCase);
+        };
         sidebar.Controls.Add(MakeLabel("Оформление", 10, tone: "muted"));
-        theme.Width = 155;
+        theme.Width = 224;
         sidebar.Controls.Add(theme);
         sidebar.Controls.Add(MakeButton("Console Hub ↗", () => Open("https://peteroxhka.github.io/ConsoleWebKit/")));
         sidebar.Controls.Add(MakeButton("Аккаунт и чат ↗", () => Open(Site)));
 
-        var hero = Section();
-        hero.Tag = "hero";
-        hero.Padding = new(22, 24, 22, 14);
-        hero.Controls.Add(MakeLabel("Что ищем сегодня?", 29, true));
-        hero.Controls.Add(total);
-        var searchBar = Flow();
-        searchBar.Dock = DockStyle.None;
-        searchBar.WrapContents = false;
-        searchBar.Padding = new(8, 7, 5, 5);
-        searchBar.Tag = "surface";
-        query.Width = 330;
-        query.BorderStyle = BorderStyle.None;
-        query.Font = new Font("Segoe UI", 12);
-        query.Margin = new(5, 10, 8, 5);
-        searchBar.Controls.AddRange([query, find]);
-        hero.Controls.Add(searchBar);
-        page.Controls.Add(hero);
-
-        page.Controls.Add(sectionTitle);
+        var toolbar = Section();
+        toolbar.Margin = Padding.Empty;
+        toolbar.Controls.Add(sectionTitle);
+        var searchRow = Flow();
+        searchRow.Dock = DockStyle.None;
+        searchRow.WrapContents = false;
+        query.Width = 345;
+        query.Font = new Font("Segoe UI", 11);
+        query.Margin = new(3, 7, 8, 4);
+        searchRow.Controls.AddRange([query, find]);
+        toolbar.Controls.Add(searchRow);
         var filters = Flow();
+        filters.Dock = DockStyle.None;
+        filters.WrapContents = false;
         filters.Controls.AddRange([language, sort, descriptions]);
-        page.Controls.Add(filters);
+        toolbar.Controls.Add(filters);
+        workspace.Controls.Add(toolbar, 0, 0);
+        page.Controls.Add(total);
         page.Controls.Add(status);
         page.Controls.Add(grid);
         page.Controls.Add(more);
@@ -149,7 +174,7 @@ internal sealed class CatalogWindow : Form
         more.Click += async (_, _) => await LoadPage(false);
         theme.SelectedIndexChanged += (_, _) => { SaveTheme(); ApplyTheme(); };
         scroll.Resize += (_, _) => { if (ColumnCount() != columns) RebuildCards(); };
-        Shown += async (_, _) => await LoadPage(true);
+        if (loadOnShow) Shown += async (_, _) => await LoadPage(true);
         FormClosed += (_, _) => { request?.Cancel(); Microsoft.Win32.SystemEvents.UserPreferenceChanged -= SystemThemeChanged; };
         Microsoft.Win32.SystemEvents.UserPreferenceChanged += SystemThemeChanged;
         ApplyTheme();
@@ -168,8 +193,8 @@ internal sealed class CatalogWindow : Form
     };
     private static Button MakeButton(string title, Action? action = null, bool primary = false)
     {
-        var button = new Button { Text = title, AutoSize = true, FlatStyle = FlatStyle.Flat,
-            Padding = new(10,4,10,4), Tag = primary ? "primary" : "" };
+        var button = new RadarButton { Text = title, AutoSize = true, FlatStyle = FlatStyle.Flat,
+            Padding = new(12,2,12,2), Tag = primary ? "primary" : "" };
         if (action is not null) button.Click += (_, _) => action();
         return button;
     }
@@ -207,7 +232,7 @@ internal sealed class CatalogWindow : Form
             2 => "#f6f8fd #ffffff #eaf0f9 #18233a #58697e #187f60 #ffffff",
             3 => "#100b26 #1e173b #29204d #f6edff #bdadd6 #ff9deb #321038",
             0 when systemLight => "#f6f8fd #ffffff #eaf0f9 #18233a #58697e #187f60 #ffffff",
-            _ => "#0a101e #111a2a #172238 #f1f5fc #96a5bf #82f0b5 #08291b"
+            _ => "#151719 #1c1e21 #282b30 #f2f3f5 #a7adb5 #67b7ff #102b42"
         };
         var p = colors.Split(' ').Select(ColorTranslator.FromHtml).ToArray();
         (background, surface, raised, foreground, muted, accent, accentText) = (p[0],p[1],p[2],p[3],p[4],p[5],p[6]);
@@ -221,7 +246,7 @@ internal sealed class CatalogWindow : Form
         control.ForeColor = primary ? accentText : Equals(control.Tag, "muted") ? muted :
             Equals(control.Tag, "accent") ? accent : foreground;
         control.BackColor = control is Label or CheckBox or FlowLayoutPanel { Tag: null } ? Color.Transparent : primary ? accent :
-            Equals(control.Tag, "surface") ? surface :
+            Equals(control.Tag, "rail") ? raised : Equals(control.Tag, "surface") ? surface :
             control is Button or ComboBox or TextBox ? raised : background;
         if (control is Button button)
         {
@@ -233,7 +258,23 @@ internal sealed class CatalogWindow : Form
         foreach (Control child in control.Controls) PaintTheme(child);
     }
 
-    private int ColumnCount() => scroll.ClientSize.Width >= 760 ? 2 : 1;
+    internal void VerifyLayout(Repository[] rows)
+    {
+        Show();
+        ApplyTheme();
+        repositories.AddRange(rows);
+        RebuildCards();
+        PerformLayout();
+        using var preview = new Bitmap(Width, Height);
+        DrawToBitmap(preview, new Rectangle(0, 0, Width, Height));
+        preview.Save(Path.Combine(Path.GetTempPath(), "RepoRadar-preview.png"));
+        if (grid.Controls.Count != rows.Length || grid.Controls.Count == 0 ||
+            chips.Controls.Cast<Control>().Any(chip => chip.Height < TextRenderer.MeasureText(chip.Text, chip.Font).Height + 4))
+            throw new InvalidOperationException("Catalog cards or category layout did not render.");
+        Hide();
+    }
+
+    private int ColumnCount() => scroll.ClientSize.Width >= 820 ? 2 : 1;
 
     private void RebuildCards()
     {
@@ -337,5 +378,42 @@ internal sealed class CatalogWindow : Form
     {
         try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
         catch (System.ComponentModel.Win32Exception) { status.Text = "Не удалось открыть ссылку."; }
+    }
+}
+
+internal sealed class RadarButton : Button
+{
+    public string? Mark { get; set; }
+    private bool hovered;
+    protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); hovered = true; Invalidate(); }
+    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hovered = false; Invalidate(); }
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        e.Graphics.Clear(Parent is { BackColor.A: > 0 } parent ? parent.BackColor : FindForm()?.BackColor ?? BackColor);
+        e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        var bounds = new Rectangle(1, 1, Width - 2, Height - 2);
+        if (bounds.Width < 4 || bounds.Height < 4) return;
+        var diameter = Math.Min(16, Math.Min(bounds.Width, bounds.Height));
+        using var path = new System.Drawing.Drawing2D.GraphicsPath();
+        path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+        path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+        path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+        path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+        path.CloseFigure();
+        using var brush = new SolidBrush(hovered && Enabled ? FlatAppearance.MouseOverBackColor : BackColor);
+        e.Graphics.FillPath(brush, path);
+        var textBounds = Rectangle.Inflate(bounds, -10, 0);
+        var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
+            TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix;
+        if (Mark is not null)
+        {
+            TextRenderer.DrawText(e.Graphics, Mark, Font, new Rectangle(textBounds.X, textBounds.Y, 30, textBounds.Height),
+                ForeColor, flags | TextFormatFlags.HorizontalCenter);
+            textBounds.X += 34;
+            textBounds.Width -= 34;
+        }
+        else flags |= TextFormatFlags.HorizontalCenter;
+        TextRenderer.DrawText(e.Graphics, Text, Font, textBounds, Enabled ? ForeColor : SystemColors.GrayText, flags);
+        if (Focused && ShowFocusCues) ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(bounds, -4, -4));
     }
 }
