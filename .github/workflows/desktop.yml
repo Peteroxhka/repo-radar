@@ -1,0 +1,31 @@
+name: Build Repo Radar Windows
+on:
+  push:
+    branches: [main]
+    paths: ['desktop/**', '.github/workflows/desktop.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish single Windows executable
+        run: dotnet publish desktop/RepoRadar.csproj -c Release -o publish
+      - name: Verify packaged app against the public catalog
+        shell: pwsh
+        run: |
+          $test = Start-Process -FilePath ./publish/RepoRadar.exe -ArgumentList '--smoke-test' -Wait -PassThru
+          if ($test.ExitCode -ne 0) { throw "Catalog smoke test failed: $($test.ExitCode)" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RepoRadar-Windows-x64
+          path: publish/RepoRadar.exe
+          if-no-files-found: error
