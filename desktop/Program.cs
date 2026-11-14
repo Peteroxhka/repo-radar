@@ -13,10 +13,10 @@ internal static class Program
         {
             try
             {
-                using var window = new CatalogWindow();
-                window.CreateControl();
                 var rows = CatalogClient.SearchAsync("@Peteroxhka", "all", "", "popular", 0, CancellationToken.None)
                     .GetAwaiter().GetResult();
+                using var window = new CatalogWindow();
+                window.CreateControl();
                 return rows.Any(row => row.FullName.Equals("Peteroxhka/repo-radar", StringComparison.OrdinalIgnoreCase)) ? 0 : 2;
             }
             catch (Exception error)
