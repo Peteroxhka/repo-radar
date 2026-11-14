@@ -18,7 +18,7 @@ internal static class Program
             }
             catch (Exception error)
             {
-                Console.Error.WriteLine(error);
+                File.WriteAllText(Path.Combine(Path.GetTempPath(), "RepoRadar-smoke-error.txt"), error.ToString());
                 return 1;
             }
         }
