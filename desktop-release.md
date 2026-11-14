@@ -1,1 +1,1 @@
-Native Windows x64 catalog app with a redesigned interface based on the Repo Radar website: project cards, category buttons, filters, sorting and four themes. Download and run RepoRadar.exe. The public catalog connects directly to Supabase. Account and chat remain on the website.
+Native Windows x64 client with a new desktop layout: category sidebar, prominent search, two-column project cards, and Auto, Dark, Light and Cosmic themes. Download and run RepoRadar.exe. Account and chat remain on the website.

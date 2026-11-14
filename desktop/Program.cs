@@ -8,10 +8,13 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        ApplicationConfiguration.Initialize();
         if (args.Contains("--smoke-test"))
         {
             try
             {
+                using var window = new CatalogWindow();
+                window.CreateControl();
                 var rows = CatalogClient.SearchAsync("@Peteroxhka", "all", "", "popular", 0, CancellationToken.None)
                     .GetAwaiter().GetResult();
                 return rows.Any(row => row.FullName.Equals("Peteroxhka/repo-radar", StringComparison.OrdinalIgnoreCase)) ? 0 : 2;
@@ -22,7 +25,6 @@ internal static class Program
                 return 1;
             }
         }
-        ApplicationConfiguration.Initialize();
         Application.Run(new CatalogWindow());
         return 0;
     }
@@ -48,7 +50,8 @@ internal sealed class CatalogWindow : Form
     private readonly Button more = MakeButton("Показать ещё");
     private readonly List<Repository> repositories = [];
     private readonly string preferences = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RepoRadar", "theme.txt");
-    private readonly FlowLayoutPanel header = Flow();
+    private readonly FlowLayoutPanel sidebar = Section();
+    private readonly Label sectionTitle = MakeLabel("Все проекты", 19, true);
     private CancellationTokenSource? request;
     private int selectedCategory, columns;
     private long matchCount;
@@ -59,14 +62,22 @@ internal sealed class CatalogWindow : Form
     {
         Text = "Repo Radar";
         ClientSize = new(1200, 820);
-        MinimumSize = new(720, 480);
+        MinimumSize = new(820, 560);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Segoe UI", 10);
         AutoScaleMode = AutoScaleMode.Dpi;
         page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         scroll.Controls.Add(page);
-        Controls.Add(scroll);
-        Controls.Add(header);
+        var shell = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
+        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 206));
+        shell.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        sidebar.Dock = DockStyle.Fill;
+        sidebar.Margin = Padding.Empty;
+        sidebar.AutoScroll = true;
+        sidebar.Padding = new(16, 18, 12, 12);
+        shell.Controls.Add(sidebar, 0, 0);
+        shell.Controls.Add(scroll, 1, 0);
+        Controls.Add(shell);
 
         theme.Items.AddRange(["Авто", "Тёмная", "Светлая", "Космос"]);
         theme.SelectedIndex = ReadTheme();
@@ -77,35 +88,56 @@ internal sealed class CatalogWindow : Form
         sort.Items.AddRange(["Популярные","Меньше звёзд","Недавно обновлённые","Новые","Больше форков"]);
         sort.SelectedIndex = 0;
         var find = MakeButton("Найти", primary: true);
-        var focus = MakeButton("Исследовать проекты", () => { scroll.ScrollControlIntoView(chips); query.Focus(); }, true);
-        header.Padding = new(24, 8, 16, 8);
-        header.Controls.AddRange([MakeLabel("repo radar", 19, true), MakeButton("Обзор", () => scroll.AutoScrollPosition = Point.Empty),
-            theme, MakeButton("Сообщения и аккаунт на сайте ↗", () => Open(Site))]);
-
-        var hero = Section();
-        hero.Controls.Add(MakeLabel("ОТКРЫТЫЙ КОД · НОВЫЕ ИДЕИ", 10, true, "accent"));
-        hero.Controls.Add(MakeLabel("Находи свой следующий\nлюбимый проект.", 30, true));
-        hero.Controls.Add(MakeLabel("Исследуй открытые репозитории GitHub и находи проекты по своим интересам.", 11, tone: "muted"));
-        var heroActions = Flow();
-        heroActions.Controls.AddRange([focus, MakeButton("Console Hub ↗", () => Open("https://peteroxhka.github.io/ConsoleWebKit/")), total]);
-        hero.Controls.Add(heroActions);
-        page.Controls.Add(hero);
-
-        var official = Section();
-        official.Controls.Add(MakeLabel("Repo Radar на GitHub", 16, true));
-        official.Controls.Add(MakeButton("Исходный код ↗", () => Open("https://github.com/Peteroxhka/repo-radar")));
-        page.Controls.Add(official);
-        page.Controls.Add(MakeLabel("Проекты, достойные внимания", 22, true));
+        sidebar.Controls.Add(MakeLabel("Repo Radar", 18, true));
+        sidebar.Controls.Add(MakeLabel("Категории", 10, tone: "muted"));
+        chips.Dock = DockStyle.None;
+        chips.FlowDirection = FlowDirection.TopDown;
+        chips.WrapContents = false;
+        sidebar.Controls.Add(chips);
         for (var i = 0; i < Names.Length; i++)
         {
             var index = i;
-            var chip = MakeButton(Names[i]);
-            chip.Click += async (_, _) => { selectedCategory = index; PaintTheme(this); await LoadPage(true); };
+            var chip = MakeButton(i == 0 ? "Все проекты" : Names[i]);
+            chip.AutoSize = false;
+            chip.Size = new(155, 33);
+            chip.TextAlign = ContentAlignment.MiddleLeft;
+            chip.Margin = new(0, 0, 0, 3);
+            chip.Click += async (_, _) =>
+            {
+                selectedCategory = index;
+                sectionTitle.Text = index == 0 ? "Все проекты" : Names[index];
+                PaintTheme(this);
+                await LoadPage(true);
+            };
             chips.Controls.Add(chip);
         }
-        page.Controls.Add(chips);
+        sidebar.Controls.Add(MakeLabel("Оформление", 10, tone: "muted"));
+        theme.Width = 155;
+        sidebar.Controls.Add(theme);
+        sidebar.Controls.Add(MakeButton("Console Hub ↗", () => Open("https://peteroxhka.github.io/ConsoleWebKit/")));
+        sidebar.Controls.Add(MakeButton("Аккаунт и чат ↗", () => Open(Site)));
+
+        var hero = Section();
+        hero.Tag = "hero";
+        hero.Padding = new(22, 24, 22, 14);
+        hero.Controls.Add(MakeLabel("Что ищем сегодня?", 29, true));
+        hero.Controls.Add(total);
+        var searchBar = Flow();
+        searchBar.Dock = DockStyle.None;
+        searchBar.WrapContents = false;
+        searchBar.Padding = new(8, 7, 5, 5);
+        searchBar.Tag = "surface";
+        query.Width = 330;
+        query.BorderStyle = BorderStyle.None;
+        query.Font = new Font("Segoe UI", 12);
+        query.Margin = new(5, 10, 8, 5);
+        searchBar.Controls.AddRange([query, find]);
+        hero.Controls.Add(searchBar);
+        page.Controls.Add(hero);
+
+        page.Controls.Add(sectionTitle);
         var filters = Flow();
-        filters.Controls.AddRange([query, language, sort, descriptions, find]);
+        filters.Controls.AddRange([language, sort, descriptions]);
         page.Controls.Add(filters);
         page.Controls.Add(status);
         page.Controls.Add(grid);
@@ -188,14 +220,20 @@ internal sealed class CatalogWindow : Form
             (control.Parent == chips && chips.Controls.IndexOf(control) == selectedCategory);
         control.ForeColor = primary ? accentText : Equals(control.Tag, "muted") ? muted :
             Equals(control.Tag, "accent") ? accent : foreground;
-        control.BackColor = control is Label or CheckBox ? Color.Transparent : primary ? accent :
+        control.BackColor = control is Label or CheckBox or FlowLayoutPanel { Tag: null } ? Color.Transparent : primary ? accent :
             Equals(control.Tag, "surface") ? surface :
             control is Button or ComboBox or TextBox ? raised : background;
-        if (control is Button button) button.FlatAppearance.BorderColor = primary ? accent : muted;
+        if (control is Button button)
+        {
+            button.FlatAppearance.BorderSize = 0;
+            button.FlatAppearance.MouseOverBackColor = primary ? ControlPaint.Light(accent) : ControlPaint.Light(raised);
+            button.FlatAppearance.MouseDownBackColor = primary ? ControlPaint.Dark(accent) : ControlPaint.Dark(raised);
+            button.Cursor = Cursors.Hand;
+        }
         foreach (Control child in control.Controls) PaintTheme(child);
     }
 
-    private int ColumnCount() => scroll.ClientSize.Width >= 1060 ? 3 : scroll.ClientSize.Width >= 720 ? 2 : 1;
+    private int ColumnCount() => scroll.ClientSize.Width >= 760 ? 2 : 1;
 
     private void RebuildCards()
     {
@@ -209,11 +247,12 @@ internal sealed class CatalogWindow : Form
             grid.ColumnCount = columns;
             grid.RowCount = (repositories.Count + columns - 1) / columns;
             for (var col = 0; col < columns; col++) grid.ColumnStyles.Add(new(SizeType.Percent, 100f / columns));
-            var width = Math.Max(210, (scroll.ClientSize.Width - 72) / columns - 40);
+            var width = Math.Max(210, (scroll.ClientSize.Width - 82) / columns - 40);
             for (var i = 0; i < repositories.Count; i++)
             {
                 var row = repositories[i];
                 var card = Section();
+                card.Padding = new(16, 12, 12, 12);
                 card.Margin = new(0,0,12,12);
                 card.Controls.Add(MakeLabel($"{row.Language ?? "GitHub"}  ·  ★ {row.Stars:N0}", 10, true, "accent"));
                 var title = MakeLabel(row.FullName, 13, true);
