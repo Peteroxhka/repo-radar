@@ -35,7 +35,7 @@ internal sealed class CatalogWindow : Form
     private static readonly string[] Categories = ["all","ai","tools","programming","web","data","games","learning","console_webkit","other"];
     private static readonly string[] Names = ["Все","ИИ","Инструменты","Код","Веб","Данные","Игры","Обучение","Консоли","Другое"];
     private static readonly string[] Sorts = ["popular","least","recent","newest","forked"];
-    private static readonly string Site = "https://peteroxhka.github.io/repo-radar/";
+    private static readonly string Website = "https://peteroxhka.github.io/repo-radar/";
     private readonly Panel scroll = new() { Dock = DockStyle.Fill, AutoScroll = true };
     private readonly TableLayoutPanel page = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, Padding = new(24,16,24,24) };
     private readonly TableLayoutPanel grid = new() { Dock = DockStyle.Top, AutoSize = true };
@@ -144,7 +144,7 @@ internal sealed class CatalogWindow : Form
         theme.Width = 224;
         sidebar.Controls.Add(theme);
         sidebar.Controls.Add(MakeButton("Console Hub ↗", () => Open("https://peteroxhka.github.io/ConsoleWebKit/")));
-        sidebar.Controls.Add(MakeButton("Аккаунт и чат ↗", () => Open(Site)));
+        sidebar.Controls.Add(MakeButton("Аккаунт и чат ↗", () => Open(Website)));
 
         var toolbar = Section();
         toolbar.Margin = Padding.Empty;
@@ -175,7 +175,8 @@ internal sealed class CatalogWindow : Form
         theme.SelectedIndexChanged += (_, _) => { SaveTheme(); ApplyTheme(); };
         scroll.Resize += (_, _) => { if (ColumnCount() != columns) RebuildCards(); };
         if (loadOnShow) Shown += async (_, _) => await LoadPage(true);
-        FormClosed += (_, _) => { request?.Cancel(); Microsoft.Win32.SystemEvents.UserPreferenceChanged -= SystemThemeChanged; };
+        FormClosed += (_, _) => request?.Cancel();
+        Disposed += (_, _) => Microsoft.Win32.SystemEvents.UserPreferenceChanged -= SystemThemeChanged;
         Microsoft.Win32.SystemEvents.UserPreferenceChanged += SystemThemeChanged;
         ApplyTheme();
     }
@@ -383,7 +384,7 @@ internal sealed class CatalogWindow : Form
 
 internal sealed class RadarButton : Button
 {
-    public string? Mark { get; set; }
+    internal string? Mark { get; set; }
     private bool hovered;
     protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); hovered = true; Invalidate(); }
     protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hovered = false; Invalidate(); }
