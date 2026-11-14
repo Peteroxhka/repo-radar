@@ -43,9 +43,9 @@ internal sealed class CatalogWindow : Form
     private readonly ComboBox sort = new() { Width = 165, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly ComboBox theme = new() { Width = 105, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly CheckBox descriptions = new() { Text = "В описаниях", AutoSize = true };
-    private readonly Label total = Label("— проектов", 11);
-    private readonly Label status = Label("Загрузка…", 10);
-    private readonly Button more = Button("Показать ещё");
+    private readonly Label total = MakeLabel("— проектов", 11);
+    private readonly Label status = MakeLabel("Загрузка…", 10);
+    private readonly Button more = MakeButton("Показать ещё");
     private readonly List<Repository> repositories = [];
     private readonly string preferences = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RepoRadar", "theme.txt");
     private readonly FlowLayoutPanel header = Flow();
@@ -76,30 +76,30 @@ internal sealed class CatalogWindow : Form
         sort.AccessibleName = "Сортировка";
         sort.Items.AddRange(["Популярные","Меньше звёзд","Недавно обновлённые","Новые","Больше форков"]);
         sort.SelectedIndex = 0;
-        var find = Button("Найти", primary: true);
-        var focus = Button("Исследовать проекты", () => { scroll.ScrollControlIntoView(chips); query.Focus(); }, true);
+        var find = MakeButton("Найти", primary: true);
+        var focus = MakeButton("Исследовать проекты", () => { scroll.ScrollControlIntoView(chips); query.Focus(); }, true);
         header.Padding = new(24, 8, 16, 8);
-        header.Controls.AddRange([Label("repo radar", 19, true), Button("Обзор", () => scroll.AutoScrollPosition = Point.Empty),
-            theme, Button("Сообщения и аккаунт на сайте ↗", () => Open(Site))]);
+        header.Controls.AddRange([MakeLabel("repo radar", 19, true), MakeButton("Обзор", () => scroll.AutoScrollPosition = Point.Empty),
+            theme, MakeButton("Сообщения и аккаунт на сайте ↗", () => Open(Site))]);
 
         var hero = Section();
-        hero.Controls.Add(Label("ОТКРЫТЫЙ КОД · НОВЫЕ ИДЕИ", 10, true, "accent"));
-        hero.Controls.Add(Label("Находи свой следующий\nлюбимый проект.", 30, true));
-        hero.Controls.Add(Label("Исследуй открытые репозитории GitHub и находи проекты по своим интересам.", 11, tone: "muted"));
+        hero.Controls.Add(MakeLabel("ОТКРЫТЫЙ КОД · НОВЫЕ ИДЕИ", 10, true, "accent"));
+        hero.Controls.Add(MakeLabel("Находи свой следующий\nлюбимый проект.", 30, true));
+        hero.Controls.Add(MakeLabel("Исследуй открытые репозитории GitHub и находи проекты по своим интересам.", 11, tone: "muted"));
         var heroActions = Flow();
-        heroActions.Controls.AddRange([focus, Button("Console Hub ↗", () => Open("https://peteroxhka.github.io/ConsoleWebKit/")), total]);
+        heroActions.Controls.AddRange([focus, MakeButton("Console Hub ↗", () => Open("https://peteroxhka.github.io/ConsoleWebKit/")), total]);
         hero.Controls.Add(heroActions);
         page.Controls.Add(hero);
 
         var official = Section();
-        official.Controls.Add(Label("Repo Radar на GitHub", 16, true));
-        official.Controls.Add(Button("Исходный код ↗", () => Open("https://github.com/Peteroxhka/repo-radar")));
+        official.Controls.Add(MakeLabel("Repo Radar на GitHub", 16, true));
+        official.Controls.Add(MakeButton("Исходный код ↗", () => Open("https://github.com/Peteroxhka/repo-radar")));
         page.Controls.Add(official);
-        page.Controls.Add(Label("Проекты, достойные внимания", 22, true));
+        page.Controls.Add(MakeLabel("Проекты, достойные внимания", 22, true));
         for (var i = 0; i < Names.Length; i++)
         {
             var index = i;
-            var chip = Button(Names[i]);
+            var chip = MakeButton(Names[i]);
             chip.Click += async (_, _) => { selectedCategory = index; PaintTheme(this); await LoadPage(true); };
             chips.Controls.Add(chip);
         }
@@ -110,7 +110,7 @@ internal sealed class CatalogWindow : Form
         page.Controls.Add(status);
         page.Controls.Add(grid);
         page.Controls.Add(more);
-        page.Controls.Add(Label("Repo Radar · Независимый каталог открытого кода", 10, tone: "muted"));
+        page.Controls.Add(MakeLabel("Repo Radar · Независимый каталог открытого кода", 10, tone: "muted"));
         more.Enabled = false;
         AcceptButton = find;
         find.Click += async (_, _) => await LoadPage(true);
@@ -123,7 +123,7 @@ internal sealed class CatalogWindow : Form
         ApplyTheme();
     }
 
-    private static Label Label(string text, float size, bool bold = false, string tone = "") => new()
+    private static Label MakeLabel(string text, float size, bool bold = false, string tone = "") => new()
     {
         Text = text, AutoSize = true, Font = new Font("Segoe UI", size, bold ? FontStyle.Bold : FontStyle.Regular),
         Tag = tone, Margin = new(3,5,8,8)
@@ -134,7 +134,7 @@ internal sealed class CatalogWindow : Form
         Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.TopDown,
         WrapContents = false, Padding = new(20), Margin = new(0,0,0,14), Tag = "surface"
     };
-    private static Button Button(string title, Action? action = null, bool primary = false)
+    private static Button MakeButton(string title, Action? action = null, bool primary = false)
     {
         var button = new Button { Text = title, AutoSize = true, FlatStyle = FlatStyle.Flat,
             Padding = new(10,4,10,4), Tag = primary ? "primary" : "" };
@@ -215,18 +215,18 @@ internal sealed class CatalogWindow : Form
                 var row = repositories[i];
                 var card = Section();
                 card.Margin = new(0,0,12,12);
-                card.Controls.Add(Label($"{row.Language ?? "GitHub"}  ·  ★ {row.Stars:N0}", 10, true, "accent"));
-                var title = Label(row.FullName, 13, true);
+                card.Controls.Add(MakeLabel($"{row.Language ?? "GitHub"}  ·  ★ {row.Stars:N0}", 10, true, "accent"));
+                var title = MakeLabel(row.FullName, 13, true);
                 title.MaximumSize = new(width,0);
                 card.Controls.Add(title);
-                var description = Label(row.Description ?? "Описание отсутствует", 10, tone: "muted");
+                var description = MakeLabel(row.Description ?? "Описание отсутствует", 10, tone: "muted");
                 description.AutoSize = false;
                 description.AutoEllipsis = true;
                 description.Size = new(width,62);
                 card.Controls.Add(description);
                 var actions = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
-                actions.Controls.Add(Button("Подробнее", () => ShowRepository(row)));
-                actions.Controls.Add(Button("GitHub ↗", () => OpenRepository(row.Url)));
+                actions.Controls.Add(MakeButton("Подробнее", () => ShowRepository(row)));
+                actions.Controls.Add(MakeButton("GitHub ↗", () => OpenRepository(row.Url)));
                 card.Controls.Add(actions);
                 grid.Controls.Add(card, i % columns, i / columns);
                 PaintTheme(card);
@@ -282,7 +282,7 @@ internal sealed class CatalogWindow : Form
         var copy = new TextBox { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true,
             ScrollBars = ScrollBars.Vertical, Text = row.Description ?? "Описание отсутствует" };
         var actions = Flow();
-        actions.Controls.Add(Button("Открыть на GitHub ↗", () => OpenRepository(row.Url), true));
+        actions.Controls.Add(MakeButton("Открыть на GitHub ↗", () => OpenRepository(row.Url), true));
         details.Controls.Add(copy);
         details.Controls.Add(actions);
         PaintTheme(details);
