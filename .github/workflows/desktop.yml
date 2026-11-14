@@ -2,8 +2,13 @@ name: Build Repo Radar Windows
 on:
   push:
     branches: [main]
-    paths: ['desktop/**', '.github/workflows/desktop.yml']
+    paths: ['desktop/**', '.github/workflows/desktop.yml', 'desktop-release.md']
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: Publish the Windows release
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -12,6 +17,8 @@ jobs:
   windows:
     runs-on: windows-latest
     timeout-minutes: 15
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -32,3 +39,16 @@ jobs:
           name: RepoRadar-Windows-x64
           path: publish/RepoRadar.exe
           if-no-files-found: error
+
+      - name: Publish Windows release
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish_release)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: desktop-v0.1.0
+        run: |
+          $tags = gh release list --limit 100 --json tagName --jq '.[].tagName'
+          if ($LASTEXITCODE -ne 0) { throw "Could not check existing releases" }
+          if ($tags -contains $env:RELEASE_TAG) { return }
+          gh release create $env:RELEASE_TAG ./publish/RepoRadar.exe --target "$env:GITHUB_SHA" --title "Repo Radar for Windows v0.1.0" --notes-file desktop-release.md
+          if ($LASTEXITCODE -ne 0) { throw "Release publication failed" }
