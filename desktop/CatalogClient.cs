@@ -34,7 +34,11 @@ internal static class CatalogClient
             sort_by = sort, include_description = false, page_size = PageSize, page_offset = offset
         });
         using var response = await Http.SendAsync(request, token);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var detail = await response.Content.ReadAsStringAsync(token);
+            throw new HttpRequestException($"Catalog HTTP {(int)response.StatusCode}: {detail[..Math.Min(detail.Length, 400)]}");
+        }
         return await response.Content.ReadFromJsonAsync<Repository[]>(cancellationToken: token)
             ?? throw new InvalidDataException("Supabase returned an empty response.");
     }
