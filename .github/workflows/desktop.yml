@@ -45,10 +45,10 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: desktop-v0.1.0
+          RELEASE_TAG: desktop-v0.2.0
         run: |
           $tags = gh release list --limit 100 --json tagName --jq '.[].tagName'
           if ($LASTEXITCODE -ne 0) { throw "Could not check existing releases" }
           if ($tags -contains $env:RELEASE_TAG) { return }
-          gh release create $env:RELEASE_TAG ./publish/RepoRadar.exe --target "$env:GITHUB_SHA" --title "Repo Radar for Windows v0.1.0" --notes-file desktop-release.md
+          gh release create $env:RELEASE_TAG ./publish/RepoRadar.exe --target "$env:GITHUB_SHA" --title "Repo Radar for Windows v0.2.0" --notes-file desktop-release.md
           if ($LASTEXITCODE -ne 0) { throw "Release publication failed" }

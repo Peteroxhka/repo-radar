@@ -20,7 +20,7 @@ internal static class CatalogClient
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(25) };
 
     public static async Task<Repository[]> SearchAsync(
-        string query, string category, string language, string sort, int offset, CancellationToken token)
+        string query, string category, string language, string sort, int offset, CancellationToken token, bool includeDescription = false)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, BaseUrl + "/rest/v1/rpc/search_catalog");
         request.Headers.Add("apikey", PublicKey);
@@ -31,7 +31,7 @@ internal static class CatalogClient
         request.Content = JsonContent.Create(new
         {
             q = query.Trim(), category_filter = category, language_filter = language,
-            sort_by = sort, include_description = false, page_size = PageSize, page_offset = offset
+            sort_by = sort, include_description = includeDescription, page_size = PageSize, page_offset = offset
         });
         using var response = await Http.SendAsync(request, token);
         if (!response.IsSuccessStatusCode)
