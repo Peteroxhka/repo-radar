@@ -384,7 +384,7 @@ internal sealed class CatalogWindow : Form
 
 internal sealed class RadarButton : Button
 {
-    internal string? Mark { get; set; }
+    internal string? Mark;
     private bool hovered;
     protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); hovered = true; Invalidate(); }
     protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hovered = false; Invalidate(); }
