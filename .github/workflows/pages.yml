@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '37 3 * * *'
 
 permissions:
   contents: read
@@ -44,6 +46,8 @@ jobs:
           npx --no-install webpack
           node -e 'require("acorn").parse(require("fs").readFileSync("assets/catalog.bundle.js","utf8"),{ecmaVersion:5})'
           rm -rf node_modules
+      - name: Export same-origin public catalog backup
+        run: node scripts/export-catalog-snapshot.mjs
       - name: Stamp build revision into static assets
         run: node scripts/stamp-build.mjs
       - uses: actions/configure-pages@v5

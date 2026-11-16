@@ -1,3 +1,4 @@
+import {loadSnapshot,filterSnapshot} from "./lib/catalog-snapshot.mjs";
 import {normalizeSearch, mergeMessages, isCurrentChat, dmConversationFilter, attachmentMime} from "./lib/core.mjs";
 import {createClient} from "@supabase/supabase-js";
 import {trustedGitHubPagesSite} from "./lib/catalog.mjs";
@@ -453,6 +454,39 @@ function openProjectDetails(repo){
  openDialog("repo-dialog");
 }
 
+// Remember transport failures for the tab so subsequent filters don't stall.
+let snapshotMode=false;
+function deadline(promise, ms){
+ let timer;
+ return Promise.race([promise,new Promise((_,reject)=>{
+  timer=setTimeout(()=>reject(new Error("Catalog request timed out")),ms);
+ })]).finally(()=>clearTimeout(timer));
+}
+async function renderSnapshot(requestId,offset,reset){
+ const snapshot=await loadSnapshot();
+ if(requestId!==state.listRequestId)return;
+ const rows=snapshot.rows;
+ const matches=state.category==="console_webkit"
+  ? sortConsoleProjects(filterConsoleProjects(rows.filter(row=>row.category==="console_webkit"),{
+      search:normalizeSearch(state.search),language:state.language,includeDescription:state.includeDescription,...state.consoleFilters
+    }),state.sort)
+  : filterSnapshot(rows,state);
+ if(state.category==="console_webkit")renderConsoleSelectors(rows.filter(row=>row.category==="console_webkit"));
+ const page=matches.slice(offset,offset+REPO_PAGE_SIZE)
+  .map(row=>({...row,site_url:trustedGitHubPagesSite(row.homepage)}));
+ state.allRows=reset?page:state.allRows.concat(page);
+ state.totalCount=matches.length;
+ state.hasMore=state.allRows.length<matches.length;
+ state.languageOptions=[...new Set(rows.map(row=>row.language).filter(Boolean))].sort();
+ state.languageOptionsLoaded=true;
+ await deadline(updateLanguageOptions(),2500).catch(()=>{});
+ if(requestId!==state.listRequestId)return;
+ renderRepos();
+ $("repo-count").textContent=matches.length.toLocaleString(locale);
+ $("load-more").hidden=$("load-more-wrap").hidden=!state.hasMore;
+ const note=locale==="ru"?"Резервная подборка":"Backup catalog";
+ setStatus("status",note+" · "+snapshot.generated_at.slice(0,10)+" · "+state.allRows.length+" / "+matches.length);
+}
 async function loadRepos(reset=true){
 if(!reset&&(state.loading||!state.hasMore))return;
 const requestId=++state.listRequestId;
@@ -463,10 +497,11 @@ const more=$("load-more");more.disabled=true;
 if(reset){const loading=document.createElement("p");loading.className="empty";loading.textContent=t("loading");$("grid").replaceChildren(loading);}
 setStatus("status",t("loading"));
 try{
-await updateCategoryCounts();
+if(snapshotMode){await renderSnapshot(requestId,offset,reset);return;}
+if(!/PlayStation/i.test(navigator.userAgent)&&!state.categoryCountsLoaded)void updateCategoryCounts();
 if(requestId!==state.listRequestId)return;
 if(state.category==="console_webkit"){
- const all=await fetchConsoleRows();
+ const all=await deadline(fetchConsoleRows(),6500);
  if(requestId!==state.listRequestId)return;
  state.consoleRows=all;renderConsoleSelectors(all);
  const filtered=sortConsoleProjects(filterConsoleProjects(all,{
@@ -478,19 +513,19 @@ if(state.category==="console_webkit"){
  state.totalCount=filtered.length;
  state.hasMore=state.allRows.length<state.totalCount;
  $("repo-count").textContent=state.totalCount.toLocaleString(locale);
- await updateLanguageOptions();
+ await deadline(updateLanguageOptions(),2500).catch(()=>{});
  if(requestId!==state.listRequestId)return;
  renderRepos();
  more.hidden=!state.hasMore;$("load-more-wrap").hidden=!state.hasMore;
  setStatus("status",`${state.allRows.length.toLocaleString(locale)} / ${state.totalCount.toLocaleString(locale)}`);
  return;
 }
-const{data,error}=await sb.rpc("search_catalog",{
+const{data,error}=await deadline(sb.rpc("search_catalog",{
  q:normalizeSearch(state.search),category_filter:state.category,
  language_filter:state.language,sort_by:state.sort,
  include_description:state.includeDescription,
  page_size:REPO_PAGE_SIZE,page_offset:offset
-});
+}),6500);
 if(requestId!==state.listRequestId)return;
 if(error)throw error;
 const page=data||[];
@@ -499,10 +534,10 @@ let forkIds=new Set();
 if(page.length){
  try{
   const ids=page.map(r=>r.id);
-  const [sitesResult,forksResult]=await Promise.all([
+  const [sitesResult,forksResult]=await deadline(Promise.all([
    sb.rpc("list_catalog_sites",{repo_ids:ids}),
    sb.from("repos").select("id").in("id",ids).eq("is_fork",true),
-  ]);
+  ]),2000);
   if(!forksResult.error)forkIds=new Set((forksResult.data||[]).map(r=>String(r.id)));
   const {data:sites,error:sitesError}=sitesResult;
   if(sitesError)throw sitesError;
@@ -515,7 +550,7 @@ state.allRows=reset?enriched:state.allRows.concat(enriched);
 state.totalCount=Number(page[0]?.total_count??(reset?0:state.totalCount));
 state.hasMore=page.length===REPO_PAGE_SIZE&&state.allRows.length<state.totalCount;
 $("repo-count").textContent=state.totalCount.toLocaleString(locale);
-await updateLanguageOptions();
+await deadline(updateLanguageOptions(),2500).catch(()=>{});
 if(requestId!==state.listRequestId)return;
 renderRepos();
 more.hidden=!state.hasMore;$("load-more-wrap").hidden=!state.hasMore;
@@ -523,8 +558,18 @@ setStatus("status",`${state.allRows.length.toLocaleString(locale)} / ${state.tot
 }
 catch(e){
 if(requestId!==state.listRequestId)return;
-setStatus("status",safeErr(e),true);
-more.hidden=!state.hasMore;$("load-more-wrap").hidden=!state.hasMore;
+console.warn("Catalog request failed:",e);
+if(!snapshotMode){
+ try {
+  await renderSnapshot(requestId,0,true);
+  if(requestId===state.listRequestId)snapshotMode=true;
+  return;
+ } catch(error){console.warn("Catalog backup failed:",error);}
+}
+if(requestId!==state.listRequestId)return;
+setStatus("status",locale==="ru"?"Не удалось загрузить каталог. Обнови страницу и попробуй снова.":"Could not load the catalog. Reload to try again.",true);
+state.hasMore=false;
+more.hidden=$("load-more-wrap").hidden=true;
 if(reset)$("grid").replaceChildren();
 }
 finally{
