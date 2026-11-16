@@ -1,5 +1,5 @@
 import {normalizeSearch, mergeMessages, isCurrentChat, dmConversationFilter, attachmentMime} from "./lib/core.mjs";
-import {createClient} from "https://esm.sh/@supabase/supabase-js@2.57.0";
+import {createClient} from "@supabase/supabase-js";
 import {trustedGitHubPagesSite} from "./lib/catalog.mjs";
 import {officialText} from "./lib/official-info.mjs";
 import {curatedDescription} from "./lib/curated-descriptions.mjs";
@@ -224,7 +224,8 @@ const localeNames={ru:"Русский",en:"English",es:"Español",fr:"Français"
 const allowedExt=new Set(["jpg","jpeg","png","webp","gif","bmp","heic","mp4","webm","mov","m4v","mp3","ogg","wav","m4a","aac","flac","pdf","txt","md","csv","json","doc","docx","xls","xlsx","ppt","pptx","odt","ods","odp","zip","7z","rar"]);
 const blockedMime=/x-msdownload|x-executable|x-sh|x-bat|x-dosexec|javascript|text\/html|svg\+xml/i;
 // English is the default for new visitors; an explicit saved choice wins.
-let locale=localStorage.getItem("radar-locale")||"en";
+let locale="en";
+try{locale=localStorage.getItem("radar-locale")||"en";}catch{}
 if(!translations[locale])locale="en";
 const systemTheme=window.matchMedia?.("(prefers-color-scheme: dark)");
 let theme="auto";
@@ -290,7 +291,7 @@ function updateSystemTheme(){if(theme==="auto")themeApply();}
 if(systemTheme?.addEventListener)systemTheme.addEventListener("change",updateSystemTheme);
 else systemTheme?.addListener?.(updateSystemTheme);
 for(const [code,name] of Object.entries(localeNames)){$("locale").add(new Option(name,code));}
-$("locale").addEventListener("change",e=>{locale=e.target.value;localStorage.setItem("radar-locale",locale);localized();});
+$("locale").addEventListener("change",e=>{locale=e.target.value;try{localStorage.setItem("radar-locale",locale);}catch{}localized();});
 $("theme").addEventListener("change",e=>{theme=e.target.value;themeApply();});
 themeApply();
 const number=n=>n>=1000?(n/1000).toFixed(1)+"k":String(n??0);
@@ -870,7 +871,7 @@ $("chat-secret-clear").onclick=()=>{
 $("message-input").onkeydown=event=>{
  if(event.key==="Enter"&&!event.shiftKey&&!event.isComposing){
   event.preventDefault();
-  if(!$("message-send").disabled)$("message-form").requestSubmit();
+  if(!$("message-send").disabled)$("message-send").click();
  }
 };
 $("message-input").oninput=()=>{
@@ -1140,5 +1141,7 @@ if(error){if(file_path){const cleanup=await sb.storage.from("repo-radar-dm").rem
 if(!current())return;setStatus("chat-status","");
 $("message-input").value="";$("message-input").style.height="auto";clearFileSelection();await loadMessages();await loadContacts();
 }catch(err){if(current())setStatus("chat-status",safeErr(err),true);}finally{if(current()){button.disabled=false;$("message-input").disabled=false;$("file-input").disabled=false;}}};
-localized();reportOAuthRedirectError();onSession().catch(e=>console.error(e));loadRepos();
+localized();reportOAuthRedirectError();onSession().catch(e=>console.error(e));
+document.documentElement.setAttribute("data-catalog-ready","true");
+loadRepos();
 

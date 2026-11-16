@@ -38,6 +38,12 @@ jobs:
           node --check unsupported-browser.js
           node --check scripts/collect.mjs
           node --test tests/*.test.mjs
+      - name: Build browser-compatible main application
+        run: |
+          npm ci
+          npx --no-install webpack
+          node -e 'require("acorn").parse(require("fs").readFileSync("assets/catalog.bundle.js","utf8"),{ecmaVersion:5})'
+          rm -rf node_modules
       - name: Stamp build revision into static assets
         run: node scripts/stamp-build.mjs
       - uses: actions/configure-pages@v5

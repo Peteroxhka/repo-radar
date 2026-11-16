@@ -1,0 +1,17 @@
+{
+  "name": "rr-compat",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "dependencies": {
+    "@babel/core": "7.28.5",
+    "@babel/preset-env": "7.28.5",
+    "@supabase/supabase-js": "2.57.0",
+    "acorn": "8.15.0",
+    "babel-loader": "10.0.0",
+    "core-js": "3.45.1",
+    "webpack": "5.112.2",
+    "webpack-cli": "6.0.1",
+    "whatwg-fetch": "3.6.20"
+  },
+  "private": true
+}

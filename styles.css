@@ -481,3 +481,14 @@ body[data-theme=cosmic] .hero h1{text-shadow:0 0 16px rgba(189,243,199,.12)}
 @media(max-width:480px){
  .console-hub-cta{width:100%;text-align:center;justify-content:center}
 }
+
+/* Basic layout remains readable where CSS Grid or newer color functions are absent. */
+.topbar { background-color: var(--bg); }
+.no-grid .repo-grid, .no-grid .console-filters-grid { display: block; }
+.no-grid .repo-card, .no-grid .console-filter-field { margin-bottom: 14px; }
+.no-grid .chat-layout { display: block; }
+.no-grid .chat-sidebar { margin-bottom: 16px; }
+button:focus, a:focus, input:focus, select:focus, textarea:focus {
+  outline: 2px solid #63c7ff;
+  outline-offset: 3px;
+}
